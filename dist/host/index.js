@@ -1,50 +1,6 @@
 /******/ (function(modules) { // webpackBootstrap
-/******/ 	// install a JSONP callback for chunk loading
-/******/ 	function webpackJsonpCallback(data) {
-/******/ 		var chunkIds = data[0];
-/******/ 		var moreModules = data[1];
-/******/
-/******/
-/******/ 		// add "moreModules" to the modules object,
-/******/ 		// then flag all "chunkIds" as loaded and fire callback
-/******/ 		var moduleId, chunkId, i = 0, resolves = [];
-/******/ 		for(;i < chunkIds.length; i++) {
-/******/ 			chunkId = chunkIds[i];
-/******/ 			if(installedChunks[chunkId]) {
-/******/ 				resolves.push(installedChunks[chunkId][0]);
-/******/ 			}
-/******/ 			installedChunks[chunkId] = 0;
-/******/ 		}
-/******/ 		for(moduleId in moreModules) {
-/******/ 			if(Object.prototype.hasOwnProperty.call(moreModules, moduleId)) {
-/******/ 				modules[moduleId] = moreModules[moduleId];
-/******/ 			}
-/******/ 		}
-/******/ 		if(parentJsonpFunction) parentJsonpFunction(data);
-/******/
-/******/ 		while(resolves.length) {
-/******/ 			resolves.shift()();
-/******/ 		}
-/******/
-/******/ 	};
-/******/
-/******/
 /******/ 	// The module cache
 /******/ 	var installedModules = {};
-/******/
-/******/ 	// object to store loaded and loading chunks
-/******/ 	// undefined = chunk not loaded, null = chunk preloaded/prefetched
-/******/ 	// Promise = chunk loading, 0 = chunk loaded
-/******/ 	var installedChunks = {
-/******/ 		0: 0
-/******/ 	};
-/******/
-/******/
-/******/
-/******/ 	// script path function
-/******/ 	function jsonpScriptSrc(chunkId) {
-/******/ 		return __webpack_require__.p + "" + chunkId + ".index.js"
-/******/ 	}
 /******/
 /******/ 	// The require function
 /******/ 	function __webpack_require__(moduleId) {
@@ -70,67 +26,6 @@
 /******/ 		return module.exports;
 /******/ 	}
 /******/
-/******/ 	// This file contains only the entry chunk.
-/******/ 	// The chunk loading function for additional chunks
-/******/ 	__webpack_require__.e = function requireEnsure(chunkId) {
-/******/ 		var promises = [];
-/******/
-/******/
-/******/ 		// JSONP chunk loading for javascript
-/******/
-/******/ 		var installedChunkData = installedChunks[chunkId];
-/******/ 		if(installedChunkData !== 0) { // 0 means "already installed".
-/******/
-/******/ 			// a Promise means "currently loading".
-/******/ 			if(installedChunkData) {
-/******/ 				promises.push(installedChunkData[2]);
-/******/ 			} else {
-/******/ 				// setup Promise in chunk cache
-/******/ 				var promise = new Promise(function(resolve, reject) {
-/******/ 					installedChunkData = installedChunks[chunkId] = [resolve, reject];
-/******/ 				});
-/******/ 				promises.push(installedChunkData[2] = promise);
-/******/
-/******/ 				// start chunk loading
-/******/ 				var script = document.createElement('script');
-/******/ 				var onScriptComplete;
-/******/
-/******/ 				script.charset = 'utf-8';
-/******/ 				script.timeout = 120;
-/******/ 				if (__webpack_require__.nc) {
-/******/ 					script.setAttribute("nonce", __webpack_require__.nc);
-/******/ 				}
-/******/ 				script.src = jsonpScriptSrc(chunkId);
-/******/
-/******/ 				// create error before stack unwound to get useful stacktrace later
-/******/ 				var error = new Error();
-/******/ 				onScriptComplete = function (event) {
-/******/ 					// avoid mem leaks in IE.
-/******/ 					script.onerror = script.onload = null;
-/******/ 					clearTimeout(timeout);
-/******/ 					var chunk = installedChunks[chunkId];
-/******/ 					if(chunk !== 0) {
-/******/ 						if(chunk) {
-/******/ 							var errorType = event && (event.type === 'load' ? 'missing' : event.type);
-/******/ 							var realSrc = event && event.target && event.target.src;
-/******/ 							error.message = 'Loading chunk ' + chunkId + ' failed.\n(' + errorType + ': ' + realSrc + ')';
-/******/ 							error.name = 'ChunkLoadError';
-/******/ 							error.type = errorType;
-/******/ 							error.request = realSrc;
-/******/ 							chunk[1](error);
-/******/ 						}
-/******/ 						installedChunks[chunkId] = undefined;
-/******/ 					}
-/******/ 				};
-/******/ 				var timeout = setTimeout(function(){
-/******/ 					onScriptComplete({ type: 'timeout', target: script });
-/******/ 				}, 120000);
-/******/ 				script.onerror = script.onload = onScriptComplete;
-/******/ 				document.head.appendChild(script);
-/******/ 			}
-/******/ 		}
-/******/ 		return Promise.all(promises);
-/******/ 	};
 /******/
 /******/ 	// expose the modules object (__webpack_modules__)
 /******/ 	__webpack_require__.m = modules;
@@ -182,17 +77,7 @@
 /******/ 	__webpack_require__.o = function(object, property) { return Object.prototype.hasOwnProperty.call(object, property); };
 /******/
 /******/ 	// __webpack_public_path__
-/******/ 	__webpack_require__.p = "/";
-/******/
-/******/ 	// on error function for async loading
-/******/ 	__webpack_require__.oe = function(err) { console.error(err); throw err; };
-/******/
-/******/ 	var jsonpArray = window["webpackJsonp"] = window["webpackJsonp"] || [];
-/******/ 	var oldJsonpFunction = jsonpArray.push.bind(jsonpArray);
-/******/ 	jsonpArray.push = webpackJsonpCallback;
-/******/ 	jsonpArray = jsonpArray.slice();
-/******/ 	for(var i = 0; i < jsonpArray.length; i++) webpackJsonpCallback(jsonpArray[i]);
-/******/ 	var parentJsonpFunction = oldJsonpFunction;
+/******/ 	__webpack_require__.p = "/gem-microfe/dist/host/";
 /******/
 /******/
 /******/ 	// Load entry module and return exports
@@ -454,9 +339,20 @@ function generateState(data, open, close, shouldClose) {
     shouldCloseHandleMap.set(state, shouldClose);
     return state;
 }
+let basePath = '';
 let history_history = {
     historyState,
-    basePath: '',
+    get basePath() {
+        return basePath;
+    },
+    set basePath(v) {
+        const { list, currentIndex } = historyState;
+        // 应用初始化的时候设置
+        const location = list[currentIndex];
+        location.path = window.location.pathname.replace(new RegExp(`^${v}`), '');
+        updateStore(historyState, {});
+        basePath = v;
+    },
     get location() {
         const { list, currentIndex } = historyState;
         const location = list[currentIndex];
@@ -2798,6 +2694,24 @@ if (!document.head.querySelector('gem-title')) {
 // CONCATENATED MODULE: ./host/routes.ts
 
 
+if (true) {
+    history_history.basePath = '/gem-microfe/dist/host';
+}
+function once(fn) {
+    let e = false;
+    return function (...rest) {
+        if (!e) {
+            fn(...rest);
+            e = true;
+        }
+    };
+}
+const importAApp = once(function () {
+    const script = document.createElement('script');
+    script.src = '/gem-microfe/dist/app/index.js';
+    document.body.append(script);
+    script.remove();
+});
 /* harmony default export */ var host_routes = ([
     {
         pattern: '/',
@@ -2808,10 +2722,13 @@ if (!document.head.querySelector('gem-title')) {
         pattern: '/a/*',
         path: '/a/a',
         get content() {
-            __webpack_require__.e(/* import() */ 1).then(__webpack_require__.t.bind(null, 1, 7));
-            return element_html `
-        <app-a-root></app-a-root>
-      `;
+            if (false) {}
+            else {
+                importAApp();
+                return element_html `
+          <app-a-root></app-a-root>
+        `;
+            }
         },
     },
     {

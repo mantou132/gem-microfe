@@ -21,7 +21,7 @@ module.exports = {
     minimize: false,
   },
   output: {
-    publicPath: '/',
+    publicPath: process.env.NODE_ENV === 'development' ? '/' : `/gem-microfe/dist/${name}/`,
     filename: 'index.js',
     path: path.resolve(__dirname, `dist/${name}`),
   },

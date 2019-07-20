@@ -77,7 +77,7 @@
 /******/ 	__webpack_require__.o = function(object, property) { return Object.prototype.hasOwnProperty.call(object, property); };
 /******/
 /******/ 	// __webpack_public_path__
-/******/ 	__webpack_require__.p = "/";
+/******/ 	__webpack_require__.p = "/gem-microfe/dist/app/";
 /******/
 /******/
 /******/ 	// Load entry module and return exports
@@ -339,9 +339,20 @@ function generateState(data, open, close, shouldClose) {
     shouldCloseHandleMap.set(state, shouldClose);
     return state;
 }
+let basePath = '';
 let history_history = {
     historyState,
-    basePath: '',
+    get basePath() {
+        return basePath;
+    },
+    set basePath(v) {
+        const { list, currentIndex } = historyState;
+        // 应用初始化的时候设置
+        const location = list[currentIndex];
+        location.path = window.location.pathname.replace(new RegExp(`^${v}`), '');
+        updateStore(historyState, {});
+        basePath = v;
+    },
     get location() {
         const { list, currentIndex } = historyState;
         const location = list[currentIndex];
