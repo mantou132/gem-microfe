@@ -13,7 +13,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@mantou/gem": "^0.1.8"
+    "@mantou/gem": "^0.1.9"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^1.11.0",

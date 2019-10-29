@@ -96,7 +96,7 @@ const updaterSet = new Set();
 function addMicrotask(func) {
     if (!updaterSet.size) {
         // delayed execution callback after updating store
-        queueMicrotask(() => {
+        window.queueMicrotask(() => {
             updaterSet.forEach(func => func());
             updaterSet.clear();
         });
@@ -285,10 +285,12 @@ const styled = {
 //# sourceMappingURL=utils.js.map
 // CONCATENATED MODULE: ./node_modules/@mantou/gem/lib/store.js
 
-const HANDLES_KEY = Symbol('handles key');
+// 不使用符号，方便跨 Realms
+const HANDLES_KEY = 'gem@storeHandlesKey';
 function createStore(originStore) {
     const store = originStore;
-    store[HANDLES_KEY] = new Set();
+    // 序列化时忽略
+    Object.defineProperty(store, HANDLES_KEY, { enumerable: false, value: new Set(), writable: true });
     return store;
 }
 function createStoreSet(originStoreSet) {
@@ -1044,6 +1046,7 @@ class template_instance_TemplateInstance {
  */
 
 
+const commentMarker = ` ${marker} `;
 /**
  * The return type of `html`, which holds a Template and the values from
  * interpolated expressions.
@@ -1097,7 +1100,7 @@ class template_result_TemplateResult {
                 // attribute values like <div foo="<!--${'bar'}">. Cases like
                 // <!-- foo=${'bar'}--> are handled correctly in the attribute branch
                 // below.
-                html += s + (isCommentBinding ? marker : nodeMarker);
+                html += s + (isCommentBinding ? commentMarker : nodeMarker);
             }
             else {
                 // For attributes we use just a marker sentinel, and also append a
@@ -1783,7 +1786,7 @@ const render = (result, container, options) => {
 // IMPORTANT: do not change the property name or the assignment expression.
 // This line will be used in regexes to search for lit-html usage.
 // TODO(justinfagnani): inject version number at build time
-(window['litHtmlVersions'] || (window['litHtmlVersions'] = [])).push('1.1.1');
+(window['litHtmlVersions'] || (window['litHtmlVersions'] = [])).push('1.1.2');
 /**
  * Interprets a template literal as an HTML template that can efficiently
  * render to and update a container.
@@ -2346,7 +2349,7 @@ class element_BaseElement extends HTMLElement {
         }
         if (observedPropertys) {
             observedPropertys.forEach(prop => {
-                let propValue;
+                let propValue = this[prop];
                 Object.defineProperty(this, prop, {
                     get: () => {
                         return propValue;
