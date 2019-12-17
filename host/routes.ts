@@ -2,27 +2,11 @@ import { html, history } from '@mantou/gem';
 
 import { RouteItem } from '@mantou/gem/elements/route';
 import '@mantou/gem/elements/title';
+import 'gem-frame';
 
 if (process.env.NODE_ENV !== 'development') {
   history.basePath = '/gem-microfe/dist/host';
 }
-
-function once(fn: Function) {
-  let e = false;
-  return function(...rest: any[]) {
-    if (!e) {
-      fn(...rest);
-      e = true;
-    }
-  };
-}
-
-const importAApp = once(function() {
-  const script = document.createElement('script');
-  script.src = '/gem-microfe/dist/app/index.js';
-  document.body.append(script);
-  script.remove();
-});
 
 export default [
   {
@@ -33,19 +17,9 @@ export default [
     title: '页面 A',
     pattern: '/a/*',
     path: '/a/a', // 给 <link> 用的
-    get content() {
-      if (process.env.NODE_ENV === 'development') {
-        import('../dist/app/');
-        return html`
-          <app-a-root></app-a-root>
-        `;
-      } else {
-        importAApp();
-        return html`
-          <app-a-root></app-a-root>
-        `;
-      }
-    },
+    content: html`
+      <gem-frame tag="app-a-root" src="https://mantou132.github.io/gem-microfe/dist/app/index.js"></gem-frame>
+    `,
   },
   {
     title: '页面 B',
