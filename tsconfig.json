@@ -1,9 +1,8 @@
 {
   "compilerOptions": {
     "baseUrl": ".",
-    "outDir": "dist",
-    "declaration": true,
-    "declarationMap": true,
+    "declaration": false,
+    "declarationMap": false,
     "sourceMap": true,
     "noImplicitAny": false,
     "module": "esnext",
@@ -12,6 +11,6 @@
     "target": "es6",
     "lib": ["es2018", "dom"]
   },
-  "include": ["host/**/*.ts", "app/**/*.ts"],
+  "include": ["src/**/*.ts"],
   "exclude": ["dist/**/*"]
 }

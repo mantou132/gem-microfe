@@ -8,12 +8,13 @@
     "build:host": "NAME=host webpack",
     "start:app": "NAME=app webpack-dev-server --open",
     "build:app": "NAME=app webpack",
+    "build": "rm -rf dist && npm run build:app && npm run build:host",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@mantou/gem": "^0.1.9",
+    "@mantou/gem": "^0.2.16",
     "gem-frame": "git+https://github.com/mantou132/gem-frame.git"
   },
   "devDependencies": {

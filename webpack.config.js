@@ -5,7 +5,7 @@ const express = require('express');
 const name = process.env.NAME;
 
 module.exports = {
-  entry: `./${name}/index.ts`,
+  entry: `./src/${name}/index.ts`,
   module: {
     rules: [
       {
@@ -25,15 +25,19 @@ module.exports = {
   },
   output: {
     publicPath: `/gem-microfe/dist/${name}/`,
-    filename: 'index.js',
+    filename: 'index.js?v=[contenthash]',
     path: path.resolve(__dirname, `dist/${name}`),
   },
   plugins: [new HtmlWebpackPlugin()],
   devServer: {
     contentBase: `./dist/${name}`,
-    historyApiFallback: true,
+    historyApiFallback: {
+      index: `/gem-microfe/dist/${name}/`,
+    },
     before: function(app) {
-      app.use('/gem-microfe/dist/app/', express.static('./dist/app'));
+      if (name === 'host') {
+        app.use('/gem-microfe/dist/app/', express.static('./dist/app'));
+      }
     },
   },
   devtool: 'source-map',

@@ -24,7 +24,8 @@ class Tabs extends GemElement {
           margin: 0 1em;
           padding: 0 0.5em;
           border-bottom: 4px solid transparent;
-          cursor: pointer;
+          text-decoration: none;
+          color: black;
         }
         gem-link[active] {
           border-bottom-color: blue;

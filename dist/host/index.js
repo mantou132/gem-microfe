@@ -1739,6 +1739,7 @@ exports.createContext = Script.createContext = function (context) {
 __webpack_require__.r(__webpack_exports__);
 
 // CONCATENATED MODULE: ./node_modules/@mantou/gem/lib/utils.js
+var utils_a, utils_b;
 const updaterSet = new Set();
 function addMicrotask(func) {
     if (!updaterSet.size) {
@@ -1751,13 +1752,22 @@ function addMicrotask(func) {
     updaterSet.delete(func);
     updaterSet.add(func);
 }
-class Pool {
+/**
+ * `EventTarget` safari not support
+ * https://bugs.webkit.org/show_bug.cgi?id=174313
+ */
+class Pool extends Image {
     constructor() {
+        super();
         this.currentId = 0;
         this.count = 0;
         this.pool = new Map();
+        // https://bugs.webkit.org/show_bug.cgi?id=198674
+        Object.setPrototypeOf(this, Pool.prototype);
     }
     add(item) {
+        if (!this.pool.size)
+            this.dispatchEvent(new CustomEvent('start'));
         this.pool.set(this.count, item);
         this.count += 1;
     }
@@ -1766,6 +1776,8 @@ class Pool {
         if (item) {
             this.pool.delete(this.currentId);
             this.currentId += 1;
+            if (!this.pool.size)
+                this.dispatchEvent(new CustomEvent('end'));
         }
         return item;
     }
@@ -1775,16 +1787,21 @@ var StorageType;
     StorageType["LOCALSTORAGE"] = "localStorage";
     StorageType["SESSIONSTORAGE"] = "sessionStorage";
 })(StorageType || (StorageType = {}));
+class StorageCache {
+    constructor() {
+        this[utils_a] = {};
+        this[utils_b] = {};
+    }
+}
+utils_a = StorageType.LOCALSTORAGE, utils_b = StorageType.SESSIONSTORAGE;
 class Storage {
     constructor() {
-        this.cache = {};
+        this.cache = new StorageCache();
     }
     get(key, type) {
-        if (!this.cache[type])
-            this.cache[type] = {};
         if (key in this.cache[type])
             return this.cache[type][key];
-        let value = window[type].getItem(key);
+        const value = window[type].getItem(key);
         if (!value)
             return undefined;
         try {
@@ -1803,8 +1820,6 @@ class Storage {
         return this.get(key, StorageType.SESSIONSTORAGE);
     }
     set(key, value, type) {
-        if (!this.cache[type])
-            this.cache[type] = {};
         this.cache[type][key] = value;
         return window[type].setItem(key, JSON.stringify(value));
     }
@@ -1820,24 +1835,17 @@ class QueryString extends URLSearchParams {
         if (param instanceof QueryString) {
             return param;
         }
-        else if (typeof param === 'string') {
-            super(param);
-        }
-        else if (param) {
-            super();
-            Object.keys(param).forEach(key => {
-                this.append(key, param[key]);
-            });
-        }
-        else {
-            super();
-        }
+        super(param);
+        /**
+         * can't extend `URLSearchParams`
+         * https://bugs.webkit.org/show_bug.cgi?id=198674
+         */
+        Object.setPrototypeOf(this, QueryString.prototype);
     }
     concat(param) {
         let query;
         if (typeof param === 'string') {
-            // @ts-ignore
-            query = Object.fromEntries(new URLSearchParams(param));
+            query = Object.fromEntries(new URLSearchParams(param).entries());
         }
         else {
             query = param;
@@ -1863,7 +1871,14 @@ function css(arr, ...args) {
     return raw(arr, ...args);
 }
 const rulesWeakMap = new WeakMap();
-// rules 引用的是字符串，所以不能动态更新
+/**
+ * !!! 目前只有 Chrome 支持
+ * https://bugzilla.mozilla.org/show_bug.cgi?id=1520690
+ *
+ * 创建 style sheet 用于 `adoptedStyleSheets`
+ * @param rules string 不能动态更新的 css
+ * @param mediaQuery string 媒体查询
+ */
 function createCSSSheet(rules, mediaQuery = '') {
     let cssSheet = rulesWeakMap.get(rules);
     if (!cssSheet) {
@@ -1929,6 +1944,15 @@ const styled = {
         return flatStyled(style, 'tag');
     },
 };
+function camelToKebabCase(str) {
+    return str.replace(/[A-Z]/g, ($1) => '-' + $1.toLowerCase());
+}
+function kebabToCamelCase(str) {
+    return str.replace(/-(.)/g, (_substr, $1) => $1.toUpperCase());
+}
+function emptyFunction() {
+    // 用于占位的空函数
+}
 //# sourceMappingURL=utils.js.map
 // CONCATENATED MODULE: ./node_modules/@mantou/gem/lib/store.js
 
@@ -1943,7 +1967,8 @@ function createStore(originStore) {
 function createStoreSet(originStoreSet) {
     const keys = Object.keys(originStoreSet);
     keys.forEach(key => {
-        createStore(originStoreSet[key]);
+        const store = originStoreSet[key];
+        createStore(store);
     });
     return originStoreSet;
 }
@@ -1982,7 +2007,7 @@ function generateState(data, open, close, shouldClose) {
         throw new Error('`$close` is not allowed');
     if (data.$shouldClose)
         throw new Error('`$shouldClose` is not allowed');
-    const state = Object.assign({}, data, { $key: Date.now() + performance.now(), $open: !!open, $close: !!close, $shouldClose: !!shouldClose });
+    const state = Object.assign(Object.assign({}, data), { $key: Date.now() + performance.now(), $open: !!open, $close: !!close, $shouldClose: !!shouldClose });
     openHandleMap.set(state, open);
     colseHandleMap.set(state, close);
     shouldCloseHandleMap.set(state, shouldClose);
@@ -2022,7 +2047,7 @@ let history_history = {
         window.history.back();
     },
     push(options) {
-        const { path, open, close, shouldClose } = options;
+        const { path = '', open, close, shouldClose } = options;
         const query = options.query || '';
         const hash = options.hash || '';
         const title = options.title || '';
@@ -2053,7 +2078,8 @@ let history_history = {
         const { state } = list[currentIndex];
         if (state.$close) {
             const closeHandle = colseHandleMap.get(state);
-            closeHandle();
+            if (closeHandle)
+                closeHandle();
             history_history.replace(options);
         }
         else {
@@ -2069,7 +2095,7 @@ let history_history = {
             hash }, options));
     },
     replace(options) {
-        const { path, open, close, shouldClose } = options;
+        const { path = '', open, close, shouldClose } = options;
         const query = options.query || '';
         const hash = options.hash || '';
         const data = options.data || {};
@@ -3861,6 +3887,76 @@ const repeat = directive_directive((items, keyFnOrTemplate, template) => {
     };
 });
 //# sourceMappingURL=repeat.js.map
+// CONCATENATED MODULE: ./node_modules/lit-html/directives/guard.js
+/**
+ * @license
+ * Copyright (c) 2018 The Polymer Project Authors. All rights reserved.
+ * This code may only be used under the BSD style license found at
+ * http://polymer.github.io/LICENSE.txt
+ * The complete set of authors may be found at
+ * http://polymer.github.io/AUTHORS.txt
+ * The complete set of contributors may be found at
+ * http://polymer.github.io/CONTRIBUTORS.txt
+ * Code distributed by Google as part of the polymer project is also
+ * subject to an additional IP rights grant found at
+ * http://polymer.github.io/PATENTS.txt
+ */
+
+const previousValues = new WeakMap();
+/**
+ * Prevents re-render of a template function until a single value or an array of
+ * values changes.
+ *
+ * Example:
+ *
+ * ```js
+ * html`
+ *   <div>
+ *     ${guard([user.id, company.id], () => html`...`)}
+ *   </div>
+ * ```
+ *
+ * In this case, the template only renders if either `user.id` or `company.id`
+ * changes.
+ *
+ * guard() is useful with immutable data patterns, by preventing expensive work
+ * until data updates.
+ *
+ * Example:
+ *
+ * ```js
+ * html`
+ *   <div>
+ *     ${guard([immutableItems], () => immutableItems.map(i => html`${i}`))}
+ *   </div>
+ * ```
+ *
+ * In this case, items are mapped over only when the array reference changes.
+ *
+ * @param value the value to check before re-rendering
+ * @param f the template function
+ */
+const guard = directive_directive((value, f) => (part) => {
+    const previousValue = previousValues.get(part);
+    if (Array.isArray(value)) {
+        // Dirty-check arrays by item
+        if (Array.isArray(previousValue) &&
+            previousValue.length === value.length &&
+            value.every((v, i) => v === previousValue[i])) {
+            return;
+        }
+    }
+    else if (previousValue === value &&
+        (value !== undefined || previousValues.has(part))) {
+        // Dirty-check non-arrays by identity
+        return;
+    }
+    part.setValue(f());
+    // Copy the value if it's an array so that if it's mutated we don't forget
+    // what the previous values were.
+    previousValues.set(part, Array.isArray(value) ? Array.from(value) : value);
+});
+//# sourceMappingURL=guard.js.map
 // CONCATENATED MODULE: ./node_modules/lit-html/directives/if-defined.js
 /**
  * @license
@@ -3895,6 +3991,8 @@ const ifDefined = directive_directive((value) => (part) => {
 });
 //# sourceMappingURL=if-defined.js.map
 // CONCATENATED MODULE: ./node_modules/@mantou/gem/lib/element.js
+/* eslint-disable @typescript-eslint/no-empty-function */
+
 
 
 
@@ -3907,6 +4005,7 @@ let litHtml = {
     render: render,
     directive: directive_directive,
     repeat: repeat,
+    guard: guard,
     ifDefined: ifDefined,
 };
 if (window.__litHtml) {
@@ -3920,42 +4019,8 @@ if (window.__litHtml) {
 else {
     window.__litHtml = litHtml;
 }
-const { html: element_html, svg: element_svg, render: element_render, directive: element_directive, repeat: element_repeat, ifDefined: element_ifDefined } = litHtml;
+const { html: element_html, svg: element_svg, render: element_render, directive: element_directive, repeat: element_repeat, guard: element_guard, ifDefined: element_ifDefined } = litHtml;
 
-const idElementMap = new Map();
-// id 必须全局唯一才能正确跳转
-// 只能检查自定义元素的 ID
-const checkHash = () => {
-    const hash = window.location.hash.substr(1);
-    if (hash) {
-        const element = idElementMap.get(hash);
-        if (element) {
-            element.scrollIntoView();
-        }
-    }
-};
-window.addEventListener('hashchange', checkHash);
-if (document.readyState === 'complete') {
-    checkHash();
-}
-else {
-    window.addEventListener('load', checkHash);
-}
-// global render task pool
-const renderTaskPool = new Pool();
-const exec = () => window.requestAnimationFrame(function callback(timestamp) {
-    const task = renderTaskPool.get();
-    if (task) {
-        task();
-        if (performance.now() - timestamp < 16) {
-            callback(timestamp);
-            return;
-        }
-    }
-    exec();
-});
-exec();
-const updaterWithSetStateSet = new Set();
 // final 字段如果使用 symbol 或者 private 将导致 modal-base 生成匿名子类 declaration 失败
 class element_BaseElement extends HTMLElement {
     constructor(shadow = true) {
@@ -3965,21 +4030,35 @@ class element_BaseElement extends HTMLElement {
         this.render = this.render.bind(this);
         this.mounted = this.mounted.bind(this);
         this.shouldUpdate = this.shouldUpdate.bind(this);
-        this.update = this.update.bind(this);
+        this.__update = this.__update.bind(this);
         this.updated = this.updated.bind(this);
-        this.disconnectStores = this.disconnectStores.bind(this);
         this.attributeChanged = this.attributeChanged.bind(this);
         this.propertyChanged = this.propertyChanged.bind(this);
         this.unmounted = this.unmounted.bind(this);
-        this._renderRoot = shadow ? this.attachShadow({ mode: 'open' }) : this;
-        const { observedAttributes, observedPropertys, observedStores, adoptedStyleSheets } = new.target;
+        this.__renderRoot = shadow ? this.attachShadow({ mode: 'open' }) : this;
+        const { observedAttributes, observedPropertys, defineEvents, observedStores, adoptedStyleSheets } = new.target;
         if (observedAttributes) {
             observedAttributes.forEach(attr => {
-                Object.defineProperty(this, attr, {
-                    get: () => {
+                const prop = kebabToCamelCase(attr);
+                // eslint-disable-next-line @typescript-eslint/ban-ts-ignore
+                // @ts-ignore
+                if (typeof this[prop] === 'function') {
+                    throw `Don't use attribute with the same name as native methods`;
+                }
+                // Native attribute，no need difine property
+                // e.g: `id`, `title`, `hidden`, `alt`, `lang`
+                // eslint-disable-next-line @typescript-eslint/ban-ts-ignore
+                // @ts-ignore
+                if (this[prop] !== undefined)
+                    return;
+                // !!! Custom property shortcut access only supports `string` type
+                Object.defineProperty(this, prop, {
+                    configurable: true,
+                    get() {
+                        // Return empty string if attribute does not exist
                         return this.getAttribute(attr) || '';
                     },
-                    set: (v) => {
+                    set(v) {
                         if (v === null) {
                             this.removeAttribute(attr);
                         }
@@ -3990,27 +4069,17 @@ class element_BaseElement extends HTMLElement {
                 });
             });
         }
-        if (observedAttributes && !observedAttributes.includes('id')) {
-            // ID 更改是触发 update，更新 `idElementMap`
-            observedAttributes.push('id');
-        }
         if (observedPropertys) {
             observedPropertys.forEach(prop => {
-                let propValue = this[prop];
-                Object.defineProperty(this, prop, {
-                    get: () => {
-                        return propValue;
-                    },
-                    set: v => {
-                        if (v !== propValue) {
-                            propValue = v;
-                            if (this._isMounted) {
-                                this.propertyChanged(prop, propValue, v);
-                                addMicrotask(this.update);
-                            }
-                        }
-                    },
-                });
+                this.__connectProperty(prop, false);
+            });
+        }
+        if (defineEvents) {
+            defineEvents.forEach(event => {
+                this.__connectProperty(event, true);
+                // eslint-disable-next-line @typescript-eslint/ban-ts-ignore
+                // @ts-ignore
+                this[event] = emptyFunction;
             });
         }
         if (observedStores) {
@@ -4018,55 +4087,120 @@ class element_BaseElement extends HTMLElement {
                 if (!store[HANDLES_KEY]) {
                     throw new Error('`observedStores` only support store module');
                 }
-                connect(store, this.update);
+                connect(store, this.__update);
             });
         }
         if (adoptedStyleSheets) {
-            (this.shadowRoot || document).adoptedStyleSheets = adoptedStyleSheets;
+            if (this.shadowRoot) {
+                this.shadowRoot.adoptedStyleSheets = adoptedStyleSheets;
+            }
+            else {
+                document.adoptedStyleSheets = document.adoptedStyleSheets.concat(adoptedStyleSheets);
+            }
         }
+    }
+    /**
+     * @final
+     * 和 `attr` 不一样，只有等 `lit-html` 在已经初始化的元素上设置 `prop` 后才能访问
+     * 所以能在类字段中直接访问 `attr` 而不能访问 `prop`
+     * @example
+     * class TempGem extends GemElement {
+     *   static observedPropertys = ['prop'];
+     *   test = expect(this.prop).to.equal(undefined);
+     * }
+     * // <temp-gem .prop=${{a: 1}}></temp-gem>
+     * */
+    __connectProperty(prop, isEventHandle = false) {
+        if (prop in this)
+            return;
+        // eslint-disable-next-line @typescript-eslint/ban-ts-ignore
+        // @ts-ignore
+        let propValue = this[prop];
+        Object.defineProperty(this, prop, {
+            configurable: true,
+            get() {
+                return propValue;
+            },
+            set(v) {
+                if (v !== propValue) {
+                    if (isEventHandle) {
+                        if (v.isEventHandle)
+                            throw `Don't assign a wrapped event handler`;
+                        propValue = (detail) => {
+                            const evt = new CustomEvent(prop.toLowerCase(), { detail });
+                            this.dispatchEvent(evt);
+                            v(evt);
+                        };
+                        propValue.isEventHandle = true;
+                    }
+                    else {
+                        propValue = v;
+                    }
+                    if (this.__isMounted) {
+                        this.propertyChanged(prop, propValue, v);
+                        addMicrotask(this.__update);
+                    }
+                }
+            },
+        });
     }
     /**@final */
     setState(payload) {
+        if (!this.state)
+            throw new Error('`state` not initialized');
         Object.assign(this.state, payload);
-        addMicrotask(this.update);
+        addMicrotask(this.__update);
     }
+    /**@lifecycle */
     willMount() { }
+    /**@lifecycle */
     render() {
         return element_html `
       <slot></slot>
     `;
     }
+    /**@lifecycle */
     mounted() { }
+    /**@lifecycle */
     shouldUpdate() {
         return true;
     }
     /**@final */
-    update() {
-        if (this._isMounted && this.shouldUpdate()) {
-            element_render(this.render(), this._renderRoot);
+    __update() {
+        if (this.__isMounted && this.shouldUpdate()) {
+            element_render(this.render(), this.__renderRoot);
             this.updated();
-            idElementMap.set(this.id, this);
         }
     }
-    updated() { }
-    /**@final */
-    disconnectStores(storeList) {
-        storeList.forEach(store => {
-            disconnect(store, this.update);
-        });
+    /**@helper */
+    update() {
+        this.__update();
     }
+    /**@lifecycle */
+    updated() { }
     // 同步触发
+    /**@lifecycle */
     propertyChanged(_name, _oldValue, _newValue) { }
     // 异步触发
+    /**@lifecycle */
     attributeChanged(_name, _oldValue, _newValue) { }
+    /**@lifecycle */
     unmounted() { }
     /**@private */
     /**@final */
     attributeChangedCallback(name, oldValue, newValue) {
-        if (this._isMounted) {
+        if (this.__isMounted) {
             this.attributeChanged(name, oldValue, newValue);
-            addMicrotask(this.update);
+            addMicrotask(this.__update);
         }
+    }
+    /**@final */
+    __connectedCallback() {
+        element_render(this.render(), this.__renderRoot);
+        const callback = this.mounted();
+        if (callback)
+            this.__unmountCallback = callback;
+        this.__isMounted = true;
     }
     /**@private */
     /**@final */
@@ -4074,36 +4208,57 @@ class element_BaseElement extends HTMLElement {
     /**@private */
     /**@final */
     disconnectedCallback() {
+        var _a, _b;
         const constructor = this.constructor;
         if (constructor.observedStores) {
             constructor.observedStores.forEach(store => {
-                disconnect(store, this.update);
+                disconnect(store, this.__update);
             });
         }
+        (_b = (_a = this).__unmountCallback) === null || _b === void 0 ? void 0 : _b.call(_a);
         this.unmounted();
-        this._isMounted = false;
+        this.__isMounted = false;
     }
 }
-element_BaseElement.observedAttributes = ['id']; // WebAPI 中是实时检查这个列表
 class GemElement extends element_BaseElement {
     /**@private */
     /**@final */
     connectedCallback() {
         this.willMount();
-        element_render(this.render(), this._renderRoot);
-        this.mounted();
-        idElementMap.set(this.id, this);
-        this._isMounted = true;
+        this.__connectedCallback();
     }
 }
+// global render task pool
+const renderTaskPool = new Pool();
+let loop = false;
+const tick = () => {
+    window.requestAnimationFrame(function callback(timestamp) {
+        const task = renderTaskPool.get();
+        if (task) {
+            task();
+            if (performance.now() - timestamp < 16) {
+                callback(timestamp);
+                return;
+            }
+        }
+        // `renderTaskPool` not empty
+        if (loop) {
+            tick();
+        }
+    });
+};
+renderTaskPool.addEventListener('start', () => {
+    loop = true;
+    tick();
+});
+renderTaskPool.addEventListener('end', () => (loop = false));
 class AsyncGemElement extends element_BaseElement {
     /**@final */
-    update() {
+    __update() {
         renderTaskPool.add(() => {
             if (this.shouldUpdate()) {
-                element_render(this.render(), this._renderRoot);
+                element_render(this.render(), this.__renderRoot);
                 this.updated();
-                idElementMap.set(this.id, this);
             }
         });
     }
@@ -4112,10 +4267,7 @@ class AsyncGemElement extends element_BaseElement {
     connectedCallback() {
         this.willMount();
         renderTaskPool.add(() => {
-            element_render(this.render(), this._renderRoot);
-            this.mounted();
-            idElementMap.set(this.id, this);
-            this._isMounted = true;
+            this.__connectedCallback();
         });
     }
 }
@@ -4129,7 +4281,51 @@ customElements.define = function (tagName, Class, options) {
     }
 };
 //# sourceMappingURL=element.js.map
+// CONCATENATED MODULE: ./node_modules/@mantou/gem/lib/decorators.js
+
+function attribute(target, prop) {
+    const con = target.constructor;
+    if (!con.observedAttributes)
+        con.observedAttributes = [];
+    con.observedAttributes.push(camelToKebabCase(prop));
+}
+function property(target, prop) {
+    const con = target.constructor;
+    if (!con.observedPropertys)
+        con.observedPropertys = [];
+    con.observedPropertys.push(prop);
+}
+function emitter(target, event) {
+    const con = target.constructor;
+    if (!con.defineEvents)
+        con.defineEvents = [];
+    con.defineEvents.push(event);
+}
+function adoptedStyle(style) {
+    return function (cls) {
+        const c = cls;
+        if (!c.adoptedStyleSheets)
+            c.adoptedStyleSheets = [];
+        c.adoptedStyleSheets.push(style);
+    };
+}
+function connectStore(store) {
+    // 这里的签名该怎么写？
+    return function (cls) {
+        const c = cls;
+        if (!c.observedStores)
+            c.observedStores = [];
+        c.observedStores.push(store);
+    };
+}
+function customElement(name) {
+    return function (cls) {
+        customElements.define(name, cls);
+    };
+}
+//# sourceMappingURL=decorators.js.map
 // CONCATENATED MODULE: ./node_modules/@mantou/gem/index.js
+
 
 
 
@@ -4197,7 +4393,7 @@ class route_Route extends GemElement {
     initPage() {
         const { list, currentIndex } = history_history.historyState;
         if (route_Route.currentRoute && route_Route.currentRoute.title && route_Route.currentRoute.title !== list[currentIndex].title) {
-            list.splice(currentIndex, 1, Object.assign({}, list[currentIndex], { title: route_Route.currentRoute.title }));
+            list.splice(currentIndex, 1, Object.assign(Object.assign({}, list[currentIndex]), { title: route_Route.currentRoute.title }));
             updateStore(history_history.historyState, {
                 list,
             });
@@ -4223,7 +4419,7 @@ class route_Route extends GemElement {
         if (!this.routes)
             return this.callback();
         route_Route.currentRoute = null;
-        let defaultRoute;
+        let defaultRoute = null;
         let routes;
         if (this.routes instanceof Array) {
             routes = this.routes;
@@ -4231,7 +4427,7 @@ class route_Route extends GemElement {
         else {
             routes = Object.values(this.routes);
         }
-        for (let item of routes) {
+        for (const item of routes) {
             const { pattern } = item;
             if ('*' === pattern) {
                 defaultRoute = item;
@@ -4268,7 +4464,7 @@ route_Route.observedPropertys = ['routes'];
 route_Route.observedStores = [history_history.historyState];
 customElements.define('gem-route', route_Route);
 //# sourceMappingURL=route.js.map
-// CONCATENATED MODULE: ./host/app-header.ts
+// CONCATENATED MODULE: ./src/host/app-header.ts
 
 class app_header_Header extends GemElement {
     render() {
@@ -4305,7 +4501,7 @@ class title_Title extends GemElement {
     }
     static setTitle(documentTitle) {
         const { list, currentIndex } = history_history.historyState;
-        list.splice(currentIndex, 1, Object.assign({}, list[currentIndex], { title: documentTitle }));
+        list.splice(currentIndex, 1, Object.assign(Object.assign({}, list[currentIndex]), { title: documentTitle }));
         updateStore(history_history.historyState, {
             list,
         });
@@ -4345,7 +4541,139 @@ if (!document.head.querySelector('gem-title')) {
 var realms_shim_umd = __webpack_require__(0);
 var realms_shim_umd_default = /*#__PURE__*/__webpack_require__.n(realms_shim_umd);
 
+// CONCATENATED MODULE: ./node_modules/gem-frame/src/proxy.ts
+function generateProxy(target, name, allowRead, allowWrite) {
+    return new Proxy(target, {
+        get(_, prop) {
+            if (prop in allowRead) {
+                return allowRead[prop];
+            }
+            else {
+                console.warn(`Read forbidden property: \`${name}.${String(prop)}\``);
+                return new Function();
+            }
+        },
+        set(_, prop, value) {
+            if (allowWrite[prop]) {
+                target[prop] = value;
+            }
+            else {
+                console.warn(`Write forbidden property: \`${name}.${String(prop)}\``);
+            }
+            return true;
+        },
+    });
+}
+function setProxy(realm, rootElement, doc) {
+    const allowReadDocument = {
+        // <gem-title>
+        get title() {
+            return document.title;
+        },
+        head: document.head,
+        // <gem-use>
+        querySelector: doc && doc.querySelector.bind(doc),
+        querySelectorAll: doc && doc.querySelectorAll.bind(doc),
+        // lit-html
+        createElement: document.createElement.bind(document),
+        createComment: document.createComment.bind(document),
+        createTextNode: document.createTextNode.bind(document),
+        createTreeWalker: document.createTreeWalker.bind(document),
+        createDocumentFragment: document.createDocumentFragment.bind(document),
+        adoptNode: document.adoptNode.bind(document),
+        importNode: document.importNode.bind(document),
+        // event
+        addEventListener: (type, callback, options) => {
+            if (['visibilitychange'].includes(type)) {
+                document.addEventListener(type, callback, options);
+                const unmounted = rootElement.unmounted;
+                rootElement.unmounted = () => {
+                    unmounted && unmounted();
+                    document.removeEventListener(type, callback, options);
+                };
+            }
+            else {
+                // mouse event, pointer event, keyboard event...
+                rootElement.addEventListener(type, callback, options);
+            }
+        },
+        removeEventListener: (type, callback, options) => {
+            rootElement.removeEventListener(type, callback, options);
+        },
+    };
+    const allowWriteDocument = {
+        // <gem-title>
+        title: true,
+    };
+    const allowReadWindow = {
+        // common
+        get name() {
+            return window.name;
+        },
+        console,
+        Headers,
+        Response,
+        Request,
+        fetch,
+        XMLHttpRequest,
+        URL,
+        URLSearchParams,
+        navigator,
+        // gem
+        Image,
+        HTMLElement,
+        customElements,
+        CustomEvent,
+        Node,
+        requestAnimationFrame: window.requestAnimationFrame.bind(window),
+        queueMicrotask: window.queueMicrotask.bind(window),
+        location: window.location,
+        localStorage,
+        sessionStorage,
+        history,
+        __gemHistory: window.__gemHistory,
+        __litHtml: window.__litHtml,
+        addEventListener: (type, callback, options) => {
+            if (['load', 'DOMContentLoaded'].includes(type)) {
+                callback();
+            }
+            else if (['unload'].includes(type)) {
+                window.addEventListener(type, callback, options);
+                const unmounted = rootElement.unmounted;
+                rootElement.unmounted = () => {
+                    unmounted && unmounted();
+                    window.removeEventListener(type, callback, options);
+                };
+            }
+            else {
+                // mouse event, pointer event, keyboard event...
+                rootElement.addEventListener(type, callback, options);
+            }
+        },
+        removeEventListener: (type, callback, options) => {
+            rootElement.removeEventListener(type, callback, options);
+        },
+        // lit-html
+        get litHtmlVersions() {
+            return window.litHtmlVersions;
+        },
+    };
+    const allowWriteWindow = {
+        name: true,
+        __gemHistory: true,
+        __litHtml: true,
+        litHtmlVersions: true,
+    };
+    Object.assign(realm.global, Object.assign({}, allowReadWindow, { document: generateProxy(document, 'document', allowReadDocument, allowWriteDocument), window: generateProxy(window, 'window', allowReadWindow, allowWriteWindow) }));
+}
+
 // CONCATENATED MODULE: ./node_modules/gem-frame/src/index.ts
+var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
 var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
     return new (P || (P = Promise))(function (resolve, reject) {
         function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
@@ -4356,49 +4684,109 @@ var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _argume
 };
 
 
-class src_GemFrame extends GemElement {
-    constructor() {
-        super(...arguments);
-        this.fetchScript = () => __awaiter(this, void 0, void 0, function* () {
-            if (customElements.get(this.tag))
+
+const fetchedScript = new Set();
+/**
+ * @attr src
+ * @attr tag
+ */
+let src_GemFrame = class GemFrame extends GemElement {
+    get useIFrame() {
+        return !this.tag;
+    }
+    fetchScript() {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (!this.src)
                 return;
-            const res = yield fetch(this.src);
-            const text = yield res.text();
+            if (fetchedScript.has(this.src))
+                return;
+            let src = this.src.startsWith('//') ? `${location.protocol}${this.src}` : this.src;
+            let doc;
+            if (src.endsWith('.json')) {
+                // webpack manifest
+                // 相对路径可能有问题
+                const manifest = yield (yield fetch(`${src}?t=${Date.now()}`)).json();
+                src = new URL(manifest.main || manifest.index, new URL(src, location.origin)).toString();
+            }
+            else if (this.src.endsWith('.js')) {
+                // 不能自动更新
+                src = this.src;
+            }
+            else {
+                // html
+                const text = yield (yield fetch(`${src}?t=${Date.now()}`)).text();
+                const parse = new DOMParser();
+                doc = parse.parseFromString(text, 'text/html');
+                const script = doc.querySelector('script[src]');
+                const { pathname, search } = new URL(script.src);
+                src = new URL(`${pathname}${search}`, new URL(src, location.origin)).toString();
+            }
+            if (!src)
+                return; // 静默失败
+            const text = yield (yield fetch(src)).text();
             const r = realms_shim_umd_default.a.makeRootRealm();
-            r.global.console = console;
-            r.global.document = document;
-            r.global.window = window;
-            r.global.navigator = navigator;
-            r.global.HTMLElement = HTMLElement;
-            r.global.customElements = customElements;
-            r.global.URLSearchParams = URLSearchParams;
-            r.global.CustomEvent = CustomEvent;
+            // 设置代理对象
+            setProxy(r, this.element, doc);
             r.evaluate(text);
+            fetchedScript.add(this.src);
         });
     }
+    appendElement() {
+        if (this.element) {
+            this.element.remove();
+        }
+        this.element = document.createElement(this.tag);
+        this.shadowRoot.append(this.element);
+    }
     mounted() {
-        this.shadowRoot.append(document.createElement(this.tag));
-        this.fetchScript();
+        if (!this.useIFrame) {
+            this.appendElement();
+            this.fetchScript();
+        }
     }
     render() {
         return element_html `
       <style>
         :host {
-          display: contents;
+          display: block;
+        }
+        ${this.tag || 'iframe'} {
+          border: none;
+          overflow: scroll;
+          display: block;
+          width: 100%;
+          height: 100%;
         }
       </style>
+      ${this.useIFrame
+            ? element_html `
+            <iframe src=${this.src}></iframe>
+          `
+            : ''}
     `;
     }
     attributeChanged(name) {
         if (name === 'src') {
             this.fetchScript();
         }
+        if (name === 'tag') {
+            this.appendElement();
+        }
     }
-}
-src_GemFrame.observedAttributes = ['src', 'tag'];
-customElements.define('gem-frame', src_GemFrame);
+};
+__decorate([
+    attribute
+], src_GemFrame.prototype, "src", void 0);
+__decorate([
+    attribute
+], src_GemFrame.prototype, "tag", void 0);
+src_GemFrame = __decorate([
+    customElement('gem-frame'),
+    connectStore(history_history.historyState)
+], src_GemFrame);
+/* harmony default export */ var gem_frame_src = (src_GemFrame);
 
-// CONCATENATED MODULE: ./host/routes.ts
+// CONCATENATED MODULE: ./src/host/routes.ts
 
 
 
@@ -4415,7 +4803,7 @@ if (true) {
         pattern: '/a/*',
         path: '/a/a',
         content: element_html `
-      <gem-frame tag="app-a-root" src="https://mantou132.github.io/gem-microfe/dist/app/index.js"></gem-frame>
+      <gem-frame tag="app-a-root" src="/gem-microfe/dist/app/"></gem-frame>
     `,
     },
     {
@@ -4442,9 +4830,23 @@ if (true) {
 ]);
 
 // CONCATENATED MODULE: ./node_modules/@mantou/gem/elements/link.js
+var link_decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
 
 
-class link_Link extends GemElement {
+/**
+ * @attr href
+ * @attr path
+ * @attr query
+ * @attr hash
+ * @attr pattern
+ * @state active
+ */
+let link_Link = class Link extends GemElement {
     constructor() {
         super();
         this.clickHandle = (e) => {
@@ -4465,12 +4867,15 @@ class link_Link extends GemElement {
                 history_history.pushWithoutCloseHandle({ path: this.path, query: this.query, hash: this.hash });
             }
         };
+        this.preventDefault = (e) => {
+            e.preventDefault();
+        };
         this.onclick = this.clickHandle;
     }
     getHref() {
         if (this.route) {
-            const queryProp = this.options ? this.options.query : '';
-            const hashProp = this.options ? this.options.hash : '';
+            const queryProp = this.options ? this.options.query || '' : '';
+            const hashProp = this.options ? this.options.hash || '' : '';
             return createPath(this.route, this.options) + queryProp + hashProp;
         }
         else {
@@ -4480,23 +4885,59 @@ class link_Link extends GemElement {
     render() {
         const { path, query, hash } = history_history.location;
         const isMatchPattern = this.pattern && isMatch(this.pattern, path);
-        if (isMatchPattern || path + query + hash === this.getHref()) {
+        const href = this.getHref();
+        if (isMatchPattern || path + query + hash === href) {
             this.setAttribute('active', '');
         }
         else {
             this.removeAttribute('active');
         }
         return element_html `
-      <slot></slot>
+      <style>
+        :host {
+          /* link default style */
+          cursor: pointer;
+          color: blue;
+          text-decoration: underline;
+        }
+        a {
+          all: unset;
+        }
+      </style>
+      <a @click=${this.preventDefault} href=${new URL(href, location.origin).toString()}>
+        <slot></slot>
+      </a>
     `;
     }
-}
-link_Link.observedAttributes = ['href', 'path', 'query', 'hash', 'pattern'];
-link_Link.observedStores = [history_history.historyState];
-link_Link.observedPropertys = ['route', 'options'];
-customElements.define('gem-link', link_Link);
+};
+link_decorate([
+    attribute
+], link_Link.prototype, "href", void 0);
+link_decorate([
+    attribute
+], link_Link.prototype, "path", void 0);
+link_decorate([
+    attribute
+], link_Link.prototype, "query", void 0);
+link_decorate([
+    attribute
+], link_Link.prototype, "hash", void 0);
+link_decorate([
+    attribute
+], link_Link.prototype, "pattern", void 0);
+link_decorate([
+    property
+], link_Link.prototype, "route", void 0);
+link_decorate([
+    property
+], link_Link.prototype, "options", void 0);
+link_Link = link_decorate([
+    customElement('gem-link'),
+    connectStore(history_history.historyState)
+], link_Link);
+
 //# sourceMappingURL=link.js.map
-// CONCATENATED MODULE: ./host/app-sidebar.ts
+// CONCATENATED MODULE: ./src/host/app-sidebar.ts
 
 
 
@@ -4514,7 +4955,8 @@ class app_sidebar_Sidebar extends GemElement {
           padding: 0;
         }
         li gem-link {
-          cursor: pointer;
+          color: white;
+          text-decoration: none;
           display: block;
           margin: 0;
           padding: 0 1em;
@@ -4543,7 +4985,7 @@ class app_sidebar_Sidebar extends GemElement {
 }
 customElements.define('app-sidebar', app_sidebar_Sidebar);
 
-// CONCATENATED MODULE: ./host/index.ts
+// CONCATENATED MODULE: ./src/host/index.ts
 
 
 
@@ -4580,4 +5022,4 @@ element_render(element_html `
 
 /***/ })
 /******/ ]);
-//# sourceMappingURL=index.js.map
+//# sourceMappingURL=index.js.map?v=b2e12bdad8b227ae33d4

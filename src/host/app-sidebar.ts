@@ -18,7 +18,8 @@ class Sidebar extends GemElement {
           padding: 0;
         }
         li gem-link {
-          cursor: pointer;
+          color: white;
+          text-decoration: none;
           display: block;
           margin: 0;
           padding: 0 1em;
