@@ -77,7 +77,7 @@
 /******/ 	__webpack_require__.o = function(object, property) { return Object.prototype.hasOwnProperty.call(object, property); };
 /******/
 /******/ 	// __webpack_public_path__
-/******/ 	__webpack_require__.p = "/gem-microfe/dist/app/";
+/******/ 	__webpack_require__.p = "/app/";
 /******/
 /******/
 /******/ 	// Load entry module and return exports
@@ -92,12 +92,13 @@
 __webpack_require__.r(__webpack_exports__);
 
 // CONCATENATED MODULE: ./node_modules/@mantou/gem/lib/utils.js
-var utils_a, utils_b;
 const updaterSet = new Set();
 function addMicrotask(func) {
+    if (typeof func !== 'function')
+        return;
     if (!updaterSet.size) {
         // delayed execution callback after updating store
-        window.queueMicrotask(() => {
+        globalThis.queueMicrotask(() => {
             updaterSet.forEach(func => func());
             updaterSet.clear();
         });
@@ -109,7 +110,8 @@ function addMicrotask(func) {
  * `EventTarget` safari not support
  * https://bugs.webkit.org/show_bug.cgi?id=174313
  */
-class Pool extends Image {
+const EventTarget = globalThis.Image || Object; // support nodejs
+class Pool extends EventTarget {
     constructor() {
         super();
         this.currentId = 0;
@@ -133,54 +135,6 @@ class Pool extends Image {
                 this.dispatchEvent(new CustomEvent('end'));
         }
         return item;
-    }
-}
-var StorageType;
-(function (StorageType) {
-    StorageType["LOCALSTORAGE"] = "localStorage";
-    StorageType["SESSIONSTORAGE"] = "sessionStorage";
-})(StorageType || (StorageType = {}));
-class StorageCache {
-    constructor() {
-        this[utils_a] = {};
-        this[utils_b] = {};
-    }
-}
-utils_a = StorageType.LOCALSTORAGE, utils_b = StorageType.SESSIONSTORAGE;
-class Storage {
-    constructor() {
-        this.cache = new StorageCache();
-    }
-    get(key, type) {
-        if (key in this.cache[type])
-            return this.cache[type][key];
-        const value = window[type].getItem(key);
-        if (!value)
-            return undefined;
-        try {
-            const result = JSON.parse(value);
-            this.cache[type][key] = result;
-            return result;
-        }
-        catch (e) {
-            window[type].removeItem(key);
-        }
-    }
-    getLocal(key) {
-        return this.get(key, StorageType.LOCALSTORAGE);
-    }
-    getSession(key) {
-        return this.get(key, StorageType.SESSIONSTORAGE);
-    }
-    set(key, value, type) {
-        this.cache[type][key] = value;
-        return window[type].setItem(key, JSON.stringify(value));
-    }
-    setLocal(key, value) {
-        return this.set(key, value, StorageType.LOCALSTORAGE);
-    }
-    setSession(key, value) {
-        return this.set(key, value, StorageType.SESSIONSTORAGE);
     }
 }
 class QueryString extends URLSearchParams {
@@ -303,6 +257,19 @@ function camelToKebabCase(str) {
 function kebabToCamelCase(str) {
     return str.replace(/-(.)/g, (_substr, $1) => $1.toUpperCase());
 }
+function cleanObject(o) {
+    Object.keys(o).forEach((key) => {
+        const k = key;
+        delete o[k];
+    });
+    return o;
+}
+class GemError extends Error {
+    constructor(msg) {
+        super(msg);
+        this.message = `gem: ${this.message}`;
+    }
+}
 function emptyFunction() {
     // 用于占位的空函数
 }
@@ -344,176 +311,179 @@ function disconnect(store, func) {
 // CONCATENATED MODULE: ./node_modules/@mantou/gem/lib/history.js
 
 
-const historyState = createStore({
-    list: [{}],
-    currentIndex: 0,
+const history_history = window.history;
+const history_location = window.location;
+const pushState = history_history.pushState.bind(history_history);
+const replaceState = history_history.replaceState.bind(history_history);
+let history_key = 0;
+const getKey = () => ++history_key;
+const history_store = createStore({
+    $hasCloseHandle: false,
+    $hasOpenHandle: false,
+    $hasShouldCloseHandle: false,
+    $key: 0,
 });
-const openHandleMap = new WeakMap();
-const colseHandleMap = new WeakMap();
-const shouldCloseHandleMap = new WeakMap();
-function generateState(data, open, close, shouldClose) {
-    if (data.$key)
-        throw new Error('`$key` is not allowed');
-    if (data.$open)
-        throw new Error('`$open` is not allowed');
-    if (data.$close)
-        throw new Error('`$close` is not allowed');
-    if (data.$shouldClose)
-        throw new Error('`$shouldClose` is not allowed');
-    const state = Object.assign(Object.assign({}, data), { $key: Date.now() + performance.now(), $open: !!open, $close: !!close, $shouldClose: !!shouldClose });
-    openHandleMap.set(state, open);
-    colseHandleMap.set(state, close);
-    shouldCloseHandleMap.set(state, shouldClose);
-    return state;
+// TODO: WeakRef
+const paramsMap = new Map();
+function validData(data) {
+    var _a, _b, _c, _d;
+    if ((_a = data) === null || _a === void 0 ? void 0 : _a.$key)
+        throw new GemError('`$key` is not allowed');
+    if ((_b = data) === null || _b === void 0 ? void 0 : _b.$hasCloseHandle)
+        throw new GemError('`$hasCloseHandle` is not allowed');
+    if ((_c = data) === null || _c === void 0 ? void 0 : _c.$hasOpenHandle)
+        throw new GemError('`$hasOpenHandle` is not allowed');
+    if ((_d = data) === null || _d === void 0 ? void 0 : _d.$hasShouldCloseHandle)
+        throw new GemError('`$hasShouldCloseHandle` is not allowed');
 }
-let basePath = '';
-let history_history = {
-    historyState,
-    get basePath() {
-        return basePath;
-    },
-    set basePath(v) {
-        const { list, currentIndex } = historyState;
-        // 应用初始化的时候设置
-        const location = list[currentIndex];
-        location.path = window.location.pathname.replace(new RegExp(`^${v}`), '');
-        updateStore(historyState, {});
-        basePath = v;
-    },
-    get location() {
-        const { list, currentIndex } = historyState;
-        const location = list[currentIndex];
-        return {
-            get query() {
-                return new QueryString(location.query);
+// 并非实际路径 `location.pathname`
+function getAbsolutePath(relativePath) {
+    if (history_history.basePath) {
+        return history_history.basePath + (relativePath === '/' ? '' : relativePath);
+    }
+    return relativePath;
+}
+function getRelativePath(realPath) {
+    return realPath.replace(new RegExp(`^${history_history.basePath}`), '');
+}
+function initParams(params) {
+    const current = paramsMap.get(history_store.$key) || {};
+    // 没提供 path 使用当前 path
+    const path = params.path || getRelativePath(history_location.pathname);
+    // 没提供 query 又没有提供 path 时使用当前 search
+    const query = new QueryString(params.query || (params.path ? '' : history_location.search));
+    const pathChanged = (params.path && params.path !== current.path) || (params.query && String(params.query) !== String(current.query));
+    const title = params.title || (pathChanged ? '' : document.title);
+    // 没提供 hash 又没有改变路径时使用当前 hash
+    const hash = params.hash || (pathChanged ? '' : decodeURIComponent(history_location.hash));
+    return Object.assign(Object.assign({}, params), { title, path, query, hash });
+}
+window.addEventListener('hashchange', ({ isTrusted }) => {
+    if (isTrusted) {
+        history_history.replace({ hash: decodeURIComponent(history_location.hash) });
+    }
+});
+function updateHistory(type, p) {
+    validData(p.data);
+    const params = initParams(p);
+    const { title, path, query, hash } = params;
+    const state = Object.assign({ $hasCloseHandle: !!params.close, $hasOpenHandle: !!params.open, $hasShouldCloseHandle: !!params.shouldClose, $key: getKey() }, (params.data || {}));
+    paramsMap.set(state.$key, params);
+    updateStore(cleanObject(history_store), state);
+    const url = getAbsolutePath(path) + new QueryString(query) + hash;
+    const prevHave = decodeURIComponent(history_location.hash);
+    (type === 'push' ? pushState : replaceState)(state, title, url);
+    if (prevHave !== hash)
+        window.dispatchEvent(new CustomEvent('hashchange'));
+}
+// 跨框架时，调用者对 basePath 无感知
+function updateHistoryByNative(type, data, title, originUrl) {
+    validData(data);
+    const state = Object.assign({ $key: getKey() }, (data || {}));
+    const { pathname, search, hash } = new URL(originUrl, history_location.origin);
+    const params = initParams({ path: pathname, query: new QueryString(search), hash, title, data });
+    paramsMap.set(state.$key, params);
+    updateStore(cleanObject(history_store), state);
+    const url = getAbsolutePath(pathname) + params.query + hash;
+    const prevHave = decodeURIComponent(history_location.hash);
+    (type === 'push' ? pushState : replaceState)(state, title, url);
+    if (prevHave !== hash)
+        window.dispatchEvent(new CustomEvent('hashchange'));
+}
+const basePathStore = createStore({
+    basePath: '',
+});
+if (!('basePath' in history_history)) {
+    // 不允许其他框架重写
+    // 保持原有功能
+    Object.defineProperties(history_history, {
+        basePath: {
+            get() {
+                return basePathStore.basePath;
             },
-            hash: location.hash,
-            path: location.path,
-            state: location.state,
-            title: location.title,
-        };
-    },
-    forward() {
-        window.history.forward();
-    },
-    back() {
-        window.history.back();
-    },
-    push(options) {
-        const { path = '', open, close, shouldClose } = options;
-        const query = options.query || '';
-        const hash = options.hash || '';
-        const title = options.title || '';
-        const data = options.data || {};
-        const state = generateState(data, open, close, shouldClose);
-        window.history.pushState(state, title, history_history.basePath + path + new QueryString(query) + hash);
-        const { list, currentIndex } = historyState;
-        if (hash !== list[currentIndex].hash)
-            window.dispatchEvent(new CustomEvent('hashchange'));
-        const newList = list.slice(0, currentIndex + 1).concat({
-            state,
-            title,
-            path,
-            query,
-            hash,
-        });
-        updateStore(historyState, {
-            list: newList,
-            currentIndex: newList.length - 1,
-        });
-    },
-    // push 一条历史记录
-    // 有 close 处理函数时先执行 closeHandle 在 replace
-    // 比如在 modal 打开时跳转页面
-    // 不完美：只支持在 1 级 modal 中切换页面
-    pushWithoutCloseHandle(options) {
-        const { list, currentIndex } = historyState;
-        const { state } = list[currentIndex];
-        if (state.$close) {
-            const closeHandle = colseHandleMap.get(state);
-            if (closeHandle)
-                closeHandle();
-            history_history.replace(options);
-        }
-        else {
-            history_history.push(options);
-        }
-    },
-    // 修改 url 意外的状态
-    pushState(options) {
-        const { list, currentIndex } = historyState;
-        const { path, query, hash } = list[currentIndex];
-        history_history.push(Object.assign({ path,
-            query,
-            hash }, options));
-    },
-    replace(options) {
-        const { path = '', open, close, shouldClose } = options;
-        const query = options.query || '';
-        const hash = options.hash || '';
-        const data = options.data || {};
-        const title = options.title || '';
-        const state = generateState(data, open, close, shouldClose);
-        window.history.replaceState(state, title, history_history.basePath + path + new QueryString(query) + hash);
-        const { list, currentIndex } = historyState;
-        if (hash !== list[currentIndex].hash)
-            window.dispatchEvent(new CustomEvent('hashchange'));
-        list.splice(currentIndex, 1, {
-            state,
-            title,
-            path,
-            query,
-            hash,
-        });
-        updateStore(historyState, {
-            list,
-        });
-    },
-    // 修改 url 意外的状态
-    replaceState(options) {
-        const { list, currentIndex } = historyState;
-        const { path, query, hash } = list[currentIndex];
-        history_history.replace(Object.assign({ path,
-            query,
-            hash }, options));
-    },
-};
-const hasOtherHistory = !!window.__gemHistory;
-if (hasOtherHistory) {
-    history_history = window.__gemHistory;
-    const basePath = history_history.basePath;
-    Object.defineProperty(history_history, 'basePath', {
-        get() {
-            return basePath;
+            set(v) {
+                if (!basePathStore.basePath) {
+                    // 应用初始化的时候设置
+                    updateStore(basePathStore, { basePath: v });
+                    // paramsMap 更新后 ui 才会更新
+                    Object.assign(paramsMap.get(history_store.$key), { path: getRelativePath(history_location.pathname) });
+                }
+                else {
+                    throw new GemError('已经有其他环境使用 gem , 会共享 history 对象，禁止再修改 history 对象');
+                }
+            },
         },
-        set() {
-            throw new Error('已经有其他环境使用 gem , 会共享 history 对象，禁止再修改 history 对象');
+        getParams: {
+            value: function () {
+                return paramsMap.get(history_store.$key);
+            },
+        },
+        updateParams: {
+            value: function (params) {
+                Object.assign(paramsMap.get(history_store.$key), params);
+                updateStore(history_store, {});
+            },
+        },
+        store: {
+            value: history_store,
+        },
+        push: {
+            value: function (params) {
+                updateHistory('push', params);
+            },
+        },
+        pushIgnoreCloseHandle: {
+            value: function (params) {
+                var _a, _b, _c;
+                if (history_store.$hasCloseHandle) {
+                    (_c = (_a = paramsMap.get(history_store.$key)) === null || _a === void 0 ? void 0 : (_b = _a).close) === null || _c === void 0 ? void 0 : _c.call(_b);
+                    history_history.replace(params);
+                }
+                else {
+                    history_history.push(params);
+                }
+            },
+        },
+        replace: {
+            value: function (params) {
+                updateHistory('replace', params);
+            },
+        },
+        pushState: {
+            value: function (data, title, path) {
+                updateHistoryByNative('push', data, title, path);
+            },
+        },
+        replaceState: {
+            value: function (data, title, path) {
+                updateHistoryByNative('replace', data, title, path);
+            },
         },
     });
-}
-else {
-    window.__gemHistory = history_history;
-    if (!window.history.state) {
-        // 初始化 historyItem[]
-        const { pathname, search, hash } = window.location;
+    if (!history_history.state) {
+        // 初始化 historyItem
+        const { pathname, search, hash } = history_location;
         history_history.replace({ path: pathname, query: search, hash });
     }
-    else if (window.history.state.$close) {
-        // 有 handle 返回键的页面刷新
+    else if (history_history.state.$hasCloseHandle) {
+        updateStore(history_store, history_history.state);
+        // 有 handle 返回键的页面刷新需要清除返回 handler
         history_history.back();
     }
-    const storage = new Storage();
-    const sessionStorageKey = 'gem@historyStateList';
-    updateStore(historyState, storage.getSession(sessionStorageKey));
-    window.addEventListener('unload', () => {
-        storage.setSession(sessionStorageKey, historyState);
-    });
+    else {
+        // 有 gem 历史的正常普通刷新, 储存 params
+        const params = initParams({ title: document.title });
+        updateStore(history_store, Object.assign({ $key: getKey() }, (history_history.state || {})));
+        paramsMap.set(history_store.$key, params);
+    }
     /**
      * 表示 popstate handler 中正在进行导航
      */
     let navigating = false;
     window.addEventListener('popstate', event => {
-        if (!event.state || !event.state.$key) {
+        var _a, _b, _c, _d, _e, _f;
+        const newState = event.state;
+        if (!((_a = newState) === null || _a === void 0 ? void 0 : _a.$key)) {
             // 比如作为其他 app 的宿主 app
             return;
         }
@@ -521,26 +491,31 @@ else {
             navigating = false;
             return;
         }
-        // forward or back
+        // 处理 forward or back
         // replace 不会触发
+        // 刷新后再导航需要从当前 state 中构建 params
+        // 理论上该条历史记录中不会出现事件处理器
+        if (!paramsMap.has(newState.$key)) {
+            const { pathname, search, hash } = history_location;
+            paramsMap.set(newState.$key, {
+                path: pathname,
+                query: new QueryString(search),
+                hash,
+                title: document.title,
+                data: newState,
+            });
+        }
         // url 变化前 historyItem
-        const { list, currentIndex } = historyState;
-        const { state: prevState } = list[currentIndex];
-        const newStateIndex = list.findIndex(({ state }) => state.$key === event.state.$key);
-        // gem app 嵌套 gem app，且不是同一个 history 对象时
-        if (newStateIndex === -1)
-            return;
-        const { state: newState } = list[newStateIndex];
-        if (newStateIndex > currentIndex && newState.$open) {
+        const prevState = history_store;
+        if (newState.$key > prevState.$key && newState.$hasOpenHandle) {
             // 返回键关闭的 modal 能前进键重新打开
             // 刷新后不能工作：刷新后 historyItem 中只有 url
-            const openHandle = openHandleMap.get(newState);
-            if (openHandle)
-                openHandle();
+            (_d = (_b = paramsMap.get(newState.$key)) === null || _b === void 0 ? void 0 : (_c = _b).open) === null || _d === void 0 ? void 0 : _d.call(_c);
         }
-        else if (prevState.$close) {
-            const closeHandle = colseHandleMap.get(prevState);
-            const shouldCloseHandle = shouldCloseHandleMap.get(prevState);
+        else if (prevState.$hasCloseHandle) {
+            const prevParams = paramsMap.get(prevState.$key);
+            const closeHandle = (_e = prevParams) === null || _e === void 0 ? void 0 : _e.close;
+            const shouldCloseHandle = (_f = prevParams) === null || _f === void 0 ? void 0 : _f.shouldClose;
             const notAllowClose = shouldCloseHandle && !shouldCloseHandle();
             if (notAllowClose) {
                 navigating = true;
@@ -552,22 +527,19 @@ else {
                 if (closeHandle) {
                     closeHandle();
                 }
-                else {
+                else if (newState.$hasCloseHandle) {
                     // 有 modal 的页面刷新会执行 back 触发 popstate
-                    // 如果是耳机 modal 页面刷新
+                    // 如果是二级 modal 页面刷新
                     // 则还需要进行一次 back
-                    // 不完美：三级 modal 页面刷新不支持返回到初始页面
+                    // !!! 不完美：三级 modal 页面刷新不支持返回到初始页面
                     navigating = true;
                     history_history.back();
                 }
             }
         }
-        updateStore(historyState, {
-            currentIndex: newStateIndex,
-        });
+        updateStore(cleanObject(history_store), newState);
     });
 }
-
 //# sourceMappingURL=history.js.map
 // CONCATENATED MODULE: ./node_modules/lit-html/lib/directive.js
 /**
@@ -2375,6 +2347,9 @@ else {
 const { html: element_html, svg: element_svg, render: element_render, directive: element_directive, repeat: element_repeat, guard: element_guard, ifDefined: element_ifDefined } = litHtml;
 
 // final 字段如果使用 symbol 或者 private 将导致 modal-base 生成匿名子类 declaration 失败
+/**
+ * @attr ref
+ */
 class element_BaseElement extends HTMLElement {
     constructor(shadow = true) {
         super();
@@ -2452,6 +2427,13 @@ class element_BaseElement extends HTMLElement {
             }
         }
     }
+    /**@final */
+    get internals() {
+        if (!this.__internals) {
+            this.__internals = this.attachInternals();
+        }
+        return this.__internals;
+    }
     /**
      * @final
      * 和 `attr` 不一样，只有等 `lit-html` 在已经初始化的元素上设置 `prop` 后才能访问
@@ -2522,7 +2504,7 @@ class element_BaseElement extends HTMLElement {
     __update() {
         if (this.__isMounted && this.shouldUpdate()) {
             element_render(this.render(), this.__renderRoot);
-            this.updated();
+            addMicrotask(this.updated);
         }
     }
     /**@helper */
@@ -2534,7 +2516,7 @@ class element_BaseElement extends HTMLElement {
     // 同步触发
     /**@lifecycle */
     propertyChanged(_name, _oldValue, _newValue) { }
-    // 异步触发
+    // 同步触发
     /**@lifecycle */
     attributeChanged(_name, _oldValue, _newValue) { }
     /**@lifecycle */
@@ -2551,7 +2533,7 @@ class element_BaseElement extends HTMLElement {
     __connectedCallback() {
         element_render(this.render(), this.__renderRoot);
         const callback = this.mounted();
-        if (callback)
+        if (typeof callback === 'function')
             this.__unmountCallback = callback;
         this.__isMounted = true;
     }
@@ -2635,7 +2617,24 @@ customElements.define = function (tagName, Class, options) {
 };
 //# sourceMappingURL=element.js.map
 // CONCATENATED MODULE: ./node_modules/@mantou/gem/lib/decorators.js
+/**
+ * target 并非元素，而是类的原型对象
+ * 不能在 target 上使用 DOM API
+ * 类定义之后立即执行，自定义元素可以在实例化时覆盖原型对象上的属性
+ */
 
+function refobject(target, prop) {
+    const attr = prop;
+    const ref = { ref: attr, element: null };
+    Object.defineProperty(target, prop, {
+        get() {
+            const that = this;
+            const ele = that.shadowRoot || that;
+            ref.element = ele.querySelector(`[ref=${prop}]`);
+            return ref;
+        },
+    });
+}
 function attribute(target, prop) {
     const con = target.constructor;
     if (!con.observedAttributes)
@@ -2647,6 +2646,37 @@ function property(target, prop) {
     if (!con.observedPropertys)
         con.observedPropertys = [];
     con.observedPropertys.push(prop);
+}
+function decorators_state(target, prop) {
+    Object.defineProperty(target, prop, {
+        get() {
+            var _a, _b;
+            const that = this;
+            return !!((_b = (_a = that.internals) === null || _a === void 0 ? void 0 : _a.states) === null || _b === void 0 ? void 0 : _b.contains(prop));
+        },
+        set(v) {
+            const that = this;
+            const internals = that.internals;
+            if (!internals.states) {
+                // 不支持 css states 时使用 classList
+                internals.states = that.classList;
+            }
+            if (v) {
+                internals.states.add(prop);
+            }
+            else {
+                internals.states.remove(prop);
+            }
+        },
+    });
+}
+function slot(target, prop) {
+    const proto = target;
+    proto[prop] = prop;
+}
+function decorators_part(target, prop) {
+    const proto = target;
+    proto[prop] = prop;
 }
 function emitter(target, event) {
     const con = target.constructor;
@@ -2685,6 +2715,13 @@ function customElement(name) {
 
 //# sourceMappingURL=index.js.map
 // CONCATENATED MODULE: ./node_modules/@mantou/gem/elements/route.js
+var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var Route_1;
 
 class ParamsRegExp extends RegExp {
     constructor(pattern) {
@@ -2717,6 +2754,8 @@ function getParams(pattern, path) {
 function isMatch(pattern, path) {
     return !!path.match(getReg(pattern));
 }
+// 从路由创建路径
+// 不包含 basePath
 function createPath(route, options) {
     let path = route.pattern;
     if (options && options.params) {
@@ -2726,37 +2765,38 @@ function createPath(route, options) {
     }
     return path;
 }
-function createLocation(route, options) {
+function createHistoryParams(route, options) {
     const path = createPath(route, options);
     return Object.assign({ path }, options);
 }
-class route_Route extends GemElement {
+/**
+ * @customElement gem-route
+ * @fires change
+ */
+let route_Route = Route_1 = class Route extends GemElement {
     constructor() {
         super();
-        const { path, query } = history_history.location;
+        const { path, query } = history_history.getParams();
         const href = path + query;
-        this.href = href;
+        this._href = href;
     }
     // 获取当前匹配的路由的 params
     static getParams() {
-        if (route_Route.currentRoute) {
-            return getParams(route_Route.currentRoute.pattern, history_history.location.path);
+        if (Route_1.currentRoute) {
+            return getParams(Route_1.currentRoute.pattern, history_history.getParams().path);
         }
     }
     initPage() {
-        const { list, currentIndex } = history_history.historyState;
-        if (route_Route.currentRoute && route_Route.currentRoute.title && route_Route.currentRoute.title !== list[currentIndex].title) {
-            list.splice(currentIndex, 1, Object.assign(Object.assign({}, list[currentIndex]), { title: route_Route.currentRoute.title }));
-            updateStore(history_history.historyState, {
-                list,
-            });
+        // 路径更新后可能发起第二次更新，更新 `document.title`
+        if (Route_1.currentRoute && Route_1.currentRoute.title && Route_1.currentRoute.title !== history_history.getParams().title) {
+            history_history.updateParams({ title: Route_1.currentRoute.title });
         }
     }
     shouldUpdate() {
-        const { path, query } = history_history.location;
+        const { path, query } = history_history.getParams();
         const href = path + query;
-        if (path + query !== this.href) {
-            this.href = href;
+        if (href !== this._href) {
+            this._href = href;
             return true;
         }
         return false;
@@ -2766,12 +2806,12 @@ class route_Route extends GemElement {
     }
     updated() {
         this.initPage();
-        this.dispatchEvent(new CustomEvent('change'));
+        this.change(Route_1.currentRoute);
     }
     render() {
         if (!this.routes)
             return this.callback();
-        route_Route.currentRoute = null;
+        Route_1.currentRoute = null;
         let defaultRoute = null;
         let routes;
         if (this.routes instanceof Array) {
@@ -2785,18 +2825,18 @@ class route_Route extends GemElement {
             if ('*' === pattern) {
                 defaultRoute = item;
             }
-            else if (isMatch(pattern, history_history.location.path)) {
-                route_Route.currentRoute = item;
+            else if (isMatch(pattern, history_history.getParams().path)) {
+                Route_1.currentRoute = item;
                 break;
             }
         }
-        if (!route_Route.currentRoute) {
-            route_Route.currentRoute = defaultRoute;
+        if (!Route_1.currentRoute) {
+            Route_1.currentRoute = defaultRoute;
         }
-        if (!route_Route.currentRoute)
+        if (!Route_1.currentRoute)
             return this.callback();
-        if (route_Route.currentRoute.redirect) {
-            history_history.replace({ path: route_Route.currentRoute.redirect });
+        if (Route_1.currentRoute.redirect) {
+            history_history.replace({ path: Route_1.currentRoute.redirect });
             return this.callback();
         }
         return element_html `
@@ -2805,62 +2845,68 @@ class route_Route extends GemElement {
           display: contents;
         }
       </style>
-      ${route_Route.currentRoute.content}
+      ${Route_1.currentRoute.content}
     `;
     }
     callback() {
-        route_Route.currentRoute = null;
+        Route_1.currentRoute = null;
         return element_html ``;
     }
-}
-route_Route.observedPropertys = ['routes'];
-route_Route.observedStores = [history_history.historyState];
-customElements.define('gem-route', route_Route);
+};
+__decorate([
+    property
+], route_Route.prototype, "routes", void 0);
+__decorate([
+    emitter
+], route_Route.prototype, "change", void 0);
+route_Route = Route_1 = __decorate([
+    connectStore(history_history.store),
+    customElement('gem-route')
+], route_Route);
+
 //# sourceMappingURL=route.js.map
 // CONCATENATED MODULE: ./node_modules/@mantou/gem/elements/title.js
+var title_decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
 
-class title_Title extends GemElement {
+/**
+ * @customElement gem-title
+ */
+let title_Title = class Title extends GemElement {
+    static setTitle(title) {
+        // 触发组件更新
+        history_history.updateParams({ title });
+    }
     constructor(isHidden) {
         super();
-        const { title } = history_history.location;
-        this.documentTitle = title;
         this.hidden = isHidden;
     }
-    static setTitle(documentTitle) {
-        const { list, currentIndex } = history_history.historyState;
-        list.splice(currentIndex, 1, Object.assign(Object.assign({}, list[currentIndex]), { title: documentTitle }));
-        updateStore(history_history.historyState, {
-            list,
-        });
-    }
-    shouldUpdate() {
-        const { title } = history_history.location;
-        if (title !== this.documentTitle) {
-            this.documentTitle = title;
-            return true;
-        }
-        return false;
-    }
     render() {
-        const { list, currentIndex } = history_history.historyState;
-        const { title } = list[currentIndex];
-        document.title = title;
+        const { title } = history_history.getParams();
+        document.title = title || this.textContent || '';
         if (this.hidden) {
             return element_html ``;
         }
-        if (!title) {
+        if (!document.title) {
             return element_html `
         <slot></slot>
       `;
         }
         return element_html `
-      ${title}
+      ${document.title}
     `;
     }
-}
-title_Title.observedStores = [history_history.historyState];
-customElements.define('gem-title', title_Title);
-if (!document.head.querySelector('gem-title')) {
+};
+title_Title = title_decorate([
+    connectStore(history_history.store),
+    customElement('gem-title')
+], title_Title);
+
+if (document.head && !document.head.querySelector('gem-title')) {
     document.head.append(new title_Title(true));
 }
 //# sourceMappingURL=title.js.map
@@ -2901,7 +2947,7 @@ if (!document.head.querySelector('gem-title')) {
 ]);
 
 // CONCATENATED MODULE: ./node_modules/@mantou/gem/elements/link.js
-var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
+var link_decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
@@ -2910,32 +2956,38 @@ var __decorate = (undefined && undefined.__decorate) || function (decorators, ta
 
 
 /**
+ * @customElement gem-link
  * @attr href
+ * @attr doc-title
  * @attr path
  * @attr query
  * @attr hash
  * @attr pattern
- * @state active
  */
 let link_Link = class Link extends GemElement {
     constructor() {
         super();
         this.clickHandle = (e) => {
             const href = this.getHref();
+            // 外部链接使用 `window.open`
             if (!href.startsWith('/')) {
                 window.open(href);
                 return;
             }
-            const { path, query, hash } = history_history.location;
+            const { path, query, hash } = history_history.getParams();
             if (path + query + hash === href) {
                 return;
             }
             e.stopPropagation();
             if (this.route) {
-                history_history.pushWithoutCloseHandle(createLocation(this.route, this.options));
+                history_history.pushIgnoreCloseHandle(Object.assign(Object.assign({}, createHistoryParams(this.route, this.options)), { title: this.route.title || this.docTitle }));
+            }
+            else if (this.href) {
+                const { pathname, search, hash } = new URL(href, location.origin);
+                history_history.pushIgnoreCloseHandle({ path: pathname, query: search, hash, title: this.docTitle });
             }
             else {
-                history_history.pushWithoutCloseHandle({ path: this.path, query: this.query, hash: this.hash });
+                history_history.pushIgnoreCloseHandle({ path: this.path, query: this.query, hash: this.hash, title: this.docTitle });
             }
         };
         this.preventDefault = (e) => {
@@ -2943,26 +2995,29 @@ let link_Link = class Link extends GemElement {
         };
         this.onclick = this.clickHandle;
     }
+    // 不包含 basePath
+    // 不支持相对路径
     getHref() {
         if (this.route) {
-            const queryProp = this.options ? this.options.query || '' : '';
-            const hashProp = this.options ? this.options.hash || '' : '';
+            const queryProp = (this.options && this.options.query) || '';
+            const hashProp = (this.options && this.options.hash) || '';
             return createPath(this.route, this.options) + queryProp + hashProp;
         }
         else {
-            return this.href || this.path + this.query + this.hash;
+            const url = this.href || this.path + this.query + this.hash;
+            const { path, query } = history_history.getParams();
+            if (url.startsWith('#')) {
+                return `${path}${query}${url}`;
+            }
+            else if (url.startsWith('?')) {
+                return `${path}${url}`;
+            }
+            else {
+                return url;
+            }
         }
     }
-    render() {
-        const { path, query, hash } = history_history.location;
-        const isMatchPattern = this.pattern && isMatch(this.pattern, path);
-        const href = this.getHref();
-        if (isMatchPattern || path + query + hash === href) {
-            this.setAttribute('active', '');
-        }
-        else {
-            this.removeAttribute('active');
-        }
+    render(href = this.getHref()) {
         return element_html `
       <style>
         :host {
@@ -2973,39 +3028,72 @@ let link_Link = class Link extends GemElement {
         }
         a {
           all: unset;
+          display: contents;
         }
       </style>
-      <a @click=${this.preventDefault} href=${new URL(href, location.origin).toString()}>
+      <a @click=${this.preventDefault} href=${new URL(history_history.basePath + href, location.origin).toString()}>
         <slot></slot>
       </a>
     `;
     }
 };
-__decorate([
+link_decorate([
     attribute
 ], link_Link.prototype, "href", void 0);
-__decorate([
+link_decorate([
     attribute
 ], link_Link.prototype, "path", void 0);
-__decorate([
+link_decorate([
     attribute
 ], link_Link.prototype, "query", void 0);
-__decorate([
+link_decorate([
     attribute
 ], link_Link.prototype, "hash", void 0);
-__decorate([
+link_decorate([
     attribute
-], link_Link.prototype, "pattern", void 0);
-__decorate([
+], link_Link.prototype, "docTitle", void 0);
+link_decorate([
     property
 ], link_Link.prototype, "route", void 0);
-__decorate([
+link_decorate([
     property
 ], link_Link.prototype, "options", void 0);
-link_Link = __decorate([
+link_Link = link_decorate([
     customElement('gem-link'),
-    connectStore(history_history.historyState)
+    connectStore(basePathStore)
 ], link_Link);
+
+/**
+ * @customElement gem-active-link
+ * @attr pattern
+ * @state active
+ */
+let link_ActiveLink = class ActiveLink extends link_Link {
+    render() {
+        const { path, query, hash } = history_history.getParams();
+        const isMatchPattern = this.pattern && isMatch(this.pattern, path);
+        const href = this.getHref();
+        if (isMatchPattern || path + query + hash === href) {
+            this.active = true;
+            this.classList.add('active'); // internals 支持 states 再删除
+        }
+        else {
+            this.active = false;
+            this.classList.remove('active');
+        }
+        return super.render(href);
+    }
+};
+link_decorate([
+    attribute
+], link_ActiveLink.prototype, "pattern", void 0);
+link_decorate([
+    decorators_state
+], link_ActiveLink.prototype, "active", void 0);
+link_ActiveLink = link_decorate([
+    customElement('gem-active-link'),
+    connectStore(history_history.store)
+], link_ActiveLink);
 
 //# sourceMappingURL=link.js.map
 // CONCATENATED MODULE: ./src/app/app-a-tabs.ts
@@ -3021,19 +3109,19 @@ class app_a_tabs_Tabs extends GemElement {
           display: flex;
           line-height: 2;
         }
-        gem-link {
+        gem-active-link {
           margin: 0 1em;
           padding: 0 0.5em;
           border-bottom: 4px solid transparent;
           text-decoration: none;
           color: black;
         }
-        gem-link[active] {
+        gem-active-link.active {
           border-bottom-color: blue;
         }
       </style>
       ${tabs.map(route => element_html `
-            <gem-link path=${route.pattern}>${route.title}</gem-link>
+            <gem-active-link path=${route.pattern}>${route.title}</gem-active-link>
           `)}
     `;
     }
@@ -3075,4 +3163,4 @@ element_render(element_html `
 
 /***/ })
 /******/ ]);
-//# sourceMappingURL=index.js.map?v=b1ffa679c734014a65e9
+//# sourceMappingURL=index.js.map?v=4356dcf70ea14497cb01

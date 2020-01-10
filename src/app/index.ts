@@ -1,17 +1,10 @@
 import { GemElement, html, render } from '@mantou/gem';
 
-import { Route } from '@mantou/gem/elements/route';
 import '@mantou/gem/elements/route';
 
 import './app-a-tabs';
 
 import routes from './routes';
-
-declare global {
-  interface HTMLElementTagNameMap {
-    'gem-route': Route;
-  }
-}
 
 export default class App extends GemElement {
   render() {

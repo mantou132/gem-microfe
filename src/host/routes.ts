@@ -5,7 +5,7 @@ import '@mantou/gem/elements/title';
 import 'gem-frame';
 
 if (process.env.NODE_ENV !== 'development') {
-  history.basePath = '/gem-microfe/dist/host';
+  history.basePath = '/host';
 }
 
 export default [
@@ -18,7 +18,7 @@ export default [
     pattern: '/a/*',
     path: '/a/a', // 给 <link> 用的
     content: html`
-      <gem-frame tag="app-a-root" src="/gem-microfe/dist/app/"></gem-frame>
+      <gem-frame tag="app-a-root" src="/app/"></gem-frame>
     `,
   },
   {

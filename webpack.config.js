@@ -24,19 +24,22 @@ module.exports = {
     minimize: false,
   },
   output: {
-    publicPath: `/gem-microfe/dist/${name}/`,
+    publicPath: `/${name}/`,
     filename: 'index.js?v=[contenthash]',
     path: path.resolve(__dirname, `dist/${name}`),
   },
   plugins: [new HtmlWebpackPlugin()],
   devServer: {
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+    },
     contentBase: `./dist/${name}`,
     historyApiFallback: {
-      index: `/gem-microfe/dist/${name}/`,
+      index: `/${name}/`,
     },
     before: function(app) {
       if (name === 'host') {
-        app.use('/gem-microfe/dist/app/', express.static('./dist/app'));
+        app.use('/app/', express.static('./dist/app'));
       }
     },
   },

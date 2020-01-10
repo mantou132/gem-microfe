@@ -17,7 +17,7 @@ class Sidebar extends GemElement {
           margin: 1em auto;
           padding: 0;
         }
-        li gem-link {
+        li gem-active-link {
           color: white;
           text-decoration: none;
           display: block;
@@ -25,10 +25,10 @@ class Sidebar extends GemElement {
           padding: 0 1em;
           line-height: 2;
         }
-        li gem-link:hover {
+        li gem-active-link:hover {
           background: rgba(255, 255, 255, 0.1);
         }
-        li gem-link[active] {
+        li gem-active-link.active {
           background: rgba(255, 255, 255, 0.2);
         }
       </style>
@@ -37,11 +37,12 @@ class Sidebar extends GemElement {
           route =>
             html`
               <li>
-                <gem-link
+                <gem-active-link
                   path=${route.path || route.pattern}
                   pattern=${ifDefined(route.path ? route.pattern : undefined)}
-                  >${route.title}</gem-link
                 >
+                  ${route.title}
+                </gem-active-link>
               </li>
             `,
         )}
