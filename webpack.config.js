@@ -5,11 +5,11 @@ const express = require('express');
 const name = process.env.NAME;
 
 module.exports = {
-  entry: `./src/${name}/index.ts`,
+  entry: `./src/${name}/`,
   module: {
     rules: [
       {
-        test: /\.ts$/,
+        test: /\.tsx?$/,
         loader: 'ts-loader',
         options: {
           allowTsInNodeModules: true,
@@ -40,6 +40,7 @@ module.exports = {
     before: function(app) {
       if (name === 'host') {
         app.use('/app/', express.static('./dist/app'));
+        app.use('/react/', express.static('./dist/react'));
       }
     },
   },

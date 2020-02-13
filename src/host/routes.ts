@@ -22,6 +22,14 @@ export default [
     `,
   },
   {
+    title: 'React',
+    pattern: '/r/*',
+    path: '/r/a', // 给 <link> 用的
+    content: html`
+      <gem-frame src="/react/"></gem-frame>
+    `,
+  },
+  {
     title: '页面 B',
     pattern: '/b',
     content: html`

@@ -8,9 +8,11 @@
     "module": "esnext",
     "moduleResolution": "node",
     "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
     "target": "es6",
+    "jsx": "react",
     "lib": ["es2018", "dom"]
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["dist/**/*"]
 }

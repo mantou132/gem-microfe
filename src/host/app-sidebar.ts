@@ -3,7 +3,7 @@ import routes from './routes';
 
 import '@mantou/gem/elements/link';
 
-const menus = routes;
+const menus = routes.filter(e => !!e.content);
 
 class Sidebar extends GemElement {
   render() {
