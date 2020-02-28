@@ -5045,9 +5045,6 @@ src_GemFrame = src_decorate([
 
 
 
-if (true) {
-    history_history.basePath = '/host';
-}
 /* harmony default export */ var host_routes = ([
     {
         pattern: '/',
@@ -5328,4 +5325,4 @@ element_render(element_html `
 
 /***/ })
 /******/ ]);
-//# sourceMappingURL=index.js.map?v=fd3e2a48f6f50170c7da
+//# sourceMappingURL=index.js.map?v=1339d3a23db39f0dcfe6

@@ -7,9 +7,13 @@
   to = "/app/index.html"
   status = 200
 [[redirects]]
-  from = "/"
-  to = "/host/"
-  status = 302
+  from = "/react/*"
+  to = "/react/index.html"
+  status = 200
+[[redirects]]
+  from = "/*"
+  to = "/host/index.html"
+  status = 200
 [[headers]]
   # Define which paths this specific [[headers]] block will cover.
   for = "/*"

@@ -1,12 +1,8 @@
-import { html, history } from '@mantou/gem';
+import { html } from '@mantou/gem';
 
 import { RouteItem } from '@mantou/gem/elements/route';
 import '@mantou/gem/elements/title';
 import 'gem-frame';
-
-if (process.env.NODE_ENV !== 'development') {
-  history.basePath = '/host';
-}
 
 export default [
   {
