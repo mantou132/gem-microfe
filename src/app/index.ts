@@ -13,8 +13,8 @@ export default class App extends GemElement {
         :host {
           display: flex;
           flex-direction: column;
-          width: 100vw;
-          height: 100vh;
+          width: 100%;
+          height: 100%;
         }
       </style>
       <app-a-tabs></app-a-tabs>
@@ -27,8 +27,10 @@ customElements.define('app-a-root', App);
 render(
   html`
     <style>
-      body {
+      html, body {
         margin: 0;
+        width: 100%;
+        height: 100%;
       }
     </style>
     <app-a-root></app-a-root>

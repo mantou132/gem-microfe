@@ -3141,8 +3141,8 @@ class app_App extends GemElement {
         :host {
           display: flex;
           flex-direction: column;
-          width: 100vw;
-          height: 100vh;
+          width: 100%;
+          height: 100%;
         }
       </style>
       <app-a-tabs></app-a-tabs>
@@ -3153,8 +3153,10 @@ class app_App extends GemElement {
 customElements.define('app-a-root', app_App);
 element_render(element_html `
     <style>
-      body {
+      html, body {
         margin: 0;
+        width: 100%;
+        height: 100%;
       }
     </style>
     <app-a-root></app-a-root>
@@ -3163,4 +3165,4 @@ element_render(element_html `
 
 /***/ })
 /******/ ]);
-//# sourceMappingURL=index.js.map?v=4356dcf70ea14497cb01
+//# sourceMappingURL=index.js.map?v=89d2b5f10b76e73f5c1f

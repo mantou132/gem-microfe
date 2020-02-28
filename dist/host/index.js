@@ -1494,11 +1494,16 @@
 
     // todo: investigate attacks via Array.species
     // todo: this accepts newShims='string', but it should reject that
-    const { shims: newShims, transforms, sloppyGlobals } = options;
+    const { shims: newShims, transforms, sloppyGlobals, errorHandler } = options;
     const allShims = arrayConcat(parentUnsafeRec.allShims, newShims);
 
     // The unsafe record is created already repaired.
     const unsafeRec = createNewUnsafeRec(allShims);
+
+    const { unsafeGlobal } = unsafeRec;
+    unsafeGlobal.addEventListener('error', err => {
+      if (errorHandler) errorHandler(err);
+    });
 
     // eslint-disable-next-line no-use-before-define
     const Realm = createRealmFacade(unsafeRec, BaseRealm);
@@ -4588,7 +4593,15 @@ var realms_shim_umd = __webpack_require__(0);
 var realms_shim_umd_default = /*#__PURE__*/__webpack_require__.n(realms_shim_umd);
 
 // CONCATENATED MODULE: ./node_modules/gem-frame/src/proxy.ts
+/* eslint-disable @typescript-eslint/camelcase */
+/**
+ * 没有提供真正的沙箱，因为共享 DOM，例如:
+ *
+ * * `Node.ownerDocument` 就能访问到原始 `document` 对象
+ * * <script> 能执行任意代码
+ */
 
+const proxy_emptyFunction = new Function();
 function generateProxy(target, name, allowRead, allowWrite) {
     return new Proxy(target, {
         get(_, prop) {
@@ -4597,7 +4610,7 @@ function generateProxy(target, name, allowRead, allowWrite) {
             }
             else {
                 console.warn(`Read forbidden property: \`${name}.${String(prop)}\``);
-                return new Function();
+                return target[prop] ? proxy_emptyFunction : undefined;
             }
         },
         set(_, prop, value) {
@@ -4611,11 +4624,25 @@ function generateProxy(target, name, allowRead, allowWrite) {
         },
     });
 }
-function setProxy(rootElement, doc = new Document()) {
+// 避免执行子 app 中的 `render(xx, ele)` 方法
+function avoidRender(ele) {
+    Object.assign(ele, {
+        insertBefore: proxy_emptyFunction,
+        querySelector: (selector) => {
+            const e = ele.querySelector(selector);
+            if (e)
+                avoidRender(e);
+            return e;
+        },
+    });
+    return ele;
+}
+function getGlobalObject(frameElement, doc = new Document()) {
     const allowReadDocument = {
         // https://developer.mozilla.org/en-US/docs/Web/API/Document
-        body: doc.body,
+        body: frameElement.tag ? avoidRender(doc.body) : frameElement.shadowRoot,
         documentElement: doc.documentElement,
+        activeElement: null,
         get cookie() {
             return document.cookie;
         },
@@ -4630,19 +4657,19 @@ function setProxy(rootElement, doc = new Document()) {
         },
         location,
         get getSelection() {
-            return rootElement.shadowRoot.getSelection;
+            return frameElement.shadowRoot.getSelection;
         },
         get elementFromPoint() {
-            return rootElement.shadowRoot.elementFromPoint;
+            return frameElement.shadowRoot.elementFromPoint;
         },
         get elementsFromPoint() {
-            return rootElement.shadowRoot.elementsFromPoint;
+            return frameElement.shadowRoot.elementsFromPoint;
         },
         get caretRangeFromPoint() {
-            return rootElement.shadowRoot.caretRangeFromPoint;
+            return frameElement.shadowRoot.caretRangeFromPoint;
         },
         get caretPositionFromPoint() {
-            return rootElement.shadowRoot.caretPositionFromPoint;
+            return frameElement.shadowRoot.caretPositionFromPoint;
         },
         // <gem-title>
         get title() {
@@ -4662,7 +4689,7 @@ function setProxy(rootElement, doc = new Document()) {
                     set(value) {
                         const gemframe = new gem_frame_src();
                         gemframe.src = value;
-                        gemframe.fetchScript();
+                        gemframe._fetchScript();
                         return true;
                     },
                 });
@@ -4676,23 +4703,26 @@ function setProxy(rootElement, doc = new Document()) {
         createDocumentFragment: document.createDocumentFragment.bind(document),
         adoptNode: document.adoptNode.bind(document),
         importNode: document.importNode.bind(document),
+        //react
+        createEvent: document.createEvent.bind(document),
         // event
         addEventListener: (type, callback, options) => {
+            // 拦截不到 react 事件，导致 react-router link 不能正常跳转
             if (['visibilitychange'].includes(type)) {
-                document.addEventListener(type, callback, options);
-                const unmounted = rootElement.unmounted;
-                rootElement.unmounted = () => {
-                    unmounted && unmounted();
-                    document.removeEventListener(type, callback, options);
-                };
+                frameElement._addProxyEventListener(document, type, callback, options);
             }
             else {
                 // mouse event, pointer event, keyboard event...
-                rootElement.addEventListener(type, callback, options);
+                frameElement._addProxyEventListener(frameElement, type, callback, options);
             }
         },
         removeEventListener: (type, callback, options) => {
-            rootElement.removeEventListener(type, callback, options);
+            if (['visibilitychange'].includes(type)) {
+                frameElement._removeProxyEventListener(document, type, callback, options);
+            }
+            else {
+                frameElement._removeProxyEventListener(frameElement, type, callback, options);
+            }
         },
     };
     const allowWriteDocument = {
@@ -4708,6 +4738,9 @@ function setProxy(rootElement, doc = new Document()) {
         // common
         get name() {
             return window.name;
+        },
+        get top() {
+            return window.top;
         },
         console,
         caches,
@@ -4729,10 +4762,10 @@ function setProxy(rootElement, doc = new Document()) {
         DOMRect,
         DOMRectReadOnly,
         get innerHeight() {
-            return rootElement.clientHeight;
+            return frameElement.clientHeight;
         },
         get innerWidth() {
-            return rootElement.clientWidth;
+            return frameElement.clientWidth;
         },
         isSecureContext,
         performance,
@@ -4758,7 +4791,7 @@ function setProxy(rootElement, doc = new Document()) {
         matchMedia: matchMedia.bind(window),
         open: open.bind(window),
         postMessage: (data) => {
-            rootElement.dispatchEvent(new MessageEvent('message', { data }));
+            frameElement.dispatchEvent(new MessageEvent('message', { data }));
         },
         parent: {
             postMessage: (data) => {
@@ -4780,7 +4813,9 @@ function setProxy(rootElement, doc = new Document()) {
         __litHtml: window.__litHtml,
         addEventListener: (type, callback, options) => {
             if (['load', 'DOMContentLoaded'].includes(type)) {
-                callback(new CustomEvent(type));
+                // 未考虑 `removeEventListener`
+                // 直接执行
+                setTimeout(() => callback(new CustomEvent(type)));
             }
             else if (['resize'].includes(type)) {
                 // 未考虑 `removeEventListener`
@@ -4792,28 +4827,33 @@ function setProxy(rootElement, doc = new Document()) {
                         }
                         called = true;
                     });
-                    resizeObserver.observe(rootElement);
+                    resizeObserver.observe(frameElement);
                 }
             }
             else if (['popstate', 'unload', 'beforeunload'].includes(type)) {
-                window.addEventListener(type, callback, options);
-                const unmounted = rootElement.unmounted;
-                rootElement.unmounted = () => {
-                    unmounted && unmounted();
-                    window.removeEventListener(type, callback, options);
-                };
+                frameElement._addProxyEventListener(window, type, callback, options);
             }
             else {
                 // mouse event, pointer event, keyboard event...
-                rootElement.addEventListener(type, callback, options);
+                frameElement._addProxyEventListener(frameElement, type, callback, options);
             }
         },
         removeEventListener: (type, callback, options) => {
-            rootElement.removeEventListener(type, callback, options);
+            if (['popstate', 'unload', 'beforeunload'].includes(type)) {
+                frameElement._removeProxyEventListener(window, type, callback, options);
+            }
+            else {
+                // mouse event, pointer event, keyboard event...
+                frameElement._removeProxyEventListener(frameElement, type, callback, options);
+            }
         },
         // lit-html
         get litHtmlVersions() {
             return window.litHtmlVersions;
+        },
+        //react
+        get __react_router_build__() {
+            return window['__react_router_build__'];
         },
     };
     const allowWriteWindow = {
@@ -4821,14 +4861,10 @@ function setProxy(rootElement, doc = new Document()) {
         name: true,
         __litHtml: true,
         litHtmlVersions: true,
+        __react_router_build__: true,
     };
     const global = generateProxy(window, 'window', allowReadWindow, allowWriteWindow);
-    return Object.assign(allowReadWindow, {
-        document: generateProxy(document, 'document', allowReadDocument, allowWriteDocument),
-        window: global,
-        globalThis: global,
-        self: global,
-    });
+    return Object.assign(allowReadWindow, Object.assign({ document: generateProxy(document, 'document', allowReadDocument, allowWriteDocument), window: global, global: global, globalThis: global, self: global }, frameElement.context));
 }
 
 // CONCATENATED MODULE: ./node_modules/gem-frame/src/index.ts
@@ -4850,35 +4886,52 @@ var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _argume
 
 
 
+
+// 方便清空内容
+const frameStyle = createCSSSheet(css `
+  :host {
+    all: initial;
+    display: block;
+    border: none;
+    overflow: auto;
+    position: relative;
+  }
+`);
 const fetchedScript = new Set();
 /**
+ * @custom-element gem-frame
+ * @prop context
  * @attr src
  * @attr tag
  * @fires error
  */
 let src_GemFrame = class GemFrame extends GemElement {
     /**
+     * @custom-element gem-frame
+     * @prop context
      * @attr src
      * @attr tag
      * @fires error
      */
     constructor() {
         super(...arguments);
-        this.errorHandle = (err) => {
-            // 捕获到的错误不能区分来源！！！
-            // 没有调用栈！！！
-            this.error(err.error);
+        // 共享到子 app 的对象
+        this.context = {};
+        this._eventListenerList = [];
+        this._errorEventHandler = ({ error }) => {
+            this.error(error);
         };
     }
-    get useIFrame() {
-        return !this.tag;
-    }
-    fetchScript() {
+    _fetchScript() {
         return __awaiter(this, void 0, void 0, function* () {
             if (!this.src)
                 return;
-            if (fetchedScript.has(this.src))
+            // 自定义元素不需要重复执行
+            if (this.tag && fetchedScript.has(this.src))
                 return;
+            // react app 执行前清空内容
+            if (!this.tag)
+                this._cleannContent();
             let src = this.src.startsWith('//') ? `${location.protocol}${this.src}` : this.src;
             let doc;
             const url = new URL(src, location.origin);
@@ -4905,10 +4958,9 @@ let src_GemFrame = class GemFrame extends GemElement {
             if (!src)
                 return; // 静默失败
             const text = yield (yield fetch(src)).text();
-            const r = realms_shim_umd_default.a.makeRootRealm();
+            const r = realms_shim_umd_default.a.makeRootRealm({ errorHandler: this._errorEventHandler });
             try {
-                // 在当前上下文中执行，所以不能用 `Error.prepareStackTrace` 改写子 App 中的异步错误
-                r.evaluate(text, setProxy(this.app, doc));
+                r.evaluate(text, getGlobalObject(this, doc));
             }
             catch (err) {
                 this.error(err);
@@ -4916,54 +4968,58 @@ let src_GemFrame = class GemFrame extends GemElement {
             fetchedScript.add(this.src);
         });
     }
-    appendElement() {
-        if (this.app)
-            this.app.remove();
-        this.app = document.createElement(this.tag);
-        // 错误传播
-        this.app.onerror = (err) => this.error(err.detail);
-        this.shadowRoot.append(this.app);
+    _updateElement() {
+        if (this.tag) {
+            this._cleannContent();
+            const app = document.createElement(this.tag);
+            // 错误传播
+            app.addEventListener('error', (err) => this.error(err.detail));
+            this.shadowRoot.append(app);
+        }
     }
-    render() {
-        const renderedElementTagName = this.useIFrame ? 'iframe' : this.tag;
-        const renderedElement = this.useIFrame
-            ? element_html `
-          <iframe src=${this.src}></iframe>
-        `
-            : '';
-        return element_html `
-      <style>
-        :host {
-          all: initial;
-          display: block;
-        }
-        ${renderedElementTagName} {
-          border: none;
-          overflow: scroll;
-          display: block;
-          width: 100%;
-          height: 100%;
-        }
-      </style>
-      ${renderedElement}
-    `;
+    _addProxyEventListener(target, event, callback, options) {
+        target.addEventListener(event, callback, options);
+        this._eventListenerList.push([target, event, callback, options]);
+    }
+    _removeProxyEventListener(target, event, callback, options) {
+        target.removeEventListener(event, callback, options);
+        const index = this._eventListenerList.findIndex(([_target, _event, _callback, _options]) => {
+            return (target === _target &&
+                event === _event &&
+                callback === _callback &&
+                (typeof options === 'object' && typeof _options === 'object'
+                    ? options.capture === _options.capture &&
+                        options.once === _options.once &&
+                        options.passive === _options.passive
+                    : options === _options));
+        });
+        if (index !== -1)
+            this._eventListenerList.splice(index, 1);
+    }
+    _cleannContent() {
+        this.shadowRoot.innerHTML = '';
+    }
+    _cleanEventListener() {
+        // 清除 `<gem-frame>` 以及 `window`, `document` 上的事件监听器
+        this._eventListenerList.forEach(([target, event, callback, options]) => {
+            target.removeEventListener(event, callback, options);
+        });
+        this._eventListenerList = [];
     }
     mounted() {
-        if (!this.useIFrame) {
-            this.appendElement();
-            this.fetchScript();
-        }
-        window.addEventListener('error', this.errorHandle);
-        return () => {
-            window.removeEventListener('error', this.errorHandle);
-        };
+        this._updateElement();
+        this._fetchScript();
+    }
+    unmounted() {
+        this._cleanEventListener();
     }
     attributeChanged(name) {
+        this._cleanEventListener();
         if (name === 'src') {
-            this.fetchScript();
+            this._fetchScript();
         }
         if (name === 'tag') {
-            this.appendElement();
+            this._updateElement();
         }
     }
 };
@@ -4976,8 +5032,12 @@ src_decorate([
 src_decorate([
     emitter
 ], src_GemFrame.prototype, "error", void 0);
+src_decorate([
+    property
+], src_GemFrame.prototype, "context", void 0);
 src_GemFrame = src_decorate([
-    customElement('gem-frame')
+    customElement('gem-frame'),
+    adoptedStyle(frameStyle)
 ], src_GemFrame);
 /* harmony default export */ var gem_frame_src = (src_GemFrame);
 
@@ -4999,6 +5059,14 @@ if (true) {
         path: '/a/a',
         content: element_html `
       <gem-frame tag="app-a-root" src="/app/"></gem-frame>
+    `,
+    },
+    {
+        title: 'React',
+        pattern: '/r/*',
+        path: '/r/a',
+        content: element_html `
+      <gem-frame src="/react/"></gem-frame>
     `,
     },
     {
@@ -5178,7 +5246,7 @@ link_ActiveLink = link_decorate([
 
 
 
-const menus = host_routes;
+const menus = host_routes.filter(e => !!e.content);
 class app_sidebar_Sidebar extends GemElement {
     render() {
         return element_html `
@@ -5260,4 +5328,4 @@ element_render(element_html `
 
 /***/ })
 /******/ ]);
-//# sourceMappingURL=index.js.map?v=d90331cedc7c47f87e16
+//# sourceMappingURL=index.js.map?v=fd3e2a48f6f50170c7da

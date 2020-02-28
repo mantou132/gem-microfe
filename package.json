@@ -10,7 +10,7 @@
     "build:app": "NAME=app webpack",
     "start:react": "NAME=react webpack-dev-server --open",
     "build:react": "NAME=react webpack",
-    "build": "rm -rf dist && npm run build:app && npm run build:host",
+    "build": "rm -rf dist && npm run build:app && npm run build:react && npm run build:host",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
