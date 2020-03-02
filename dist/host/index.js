@@ -4598,9 +4598,18 @@ var realms_shim_umd_default = /*#__PURE__*/__webpack_require__.n(realms_shim_umd
  * 没有提供真正的沙箱，因为共享 DOM，例如:
  *
  * * `Node.ownerDocument` 就能访问到原始 `document` 对象
- * * <script> 能执行任意代码
+ * * `<script>` 能执行任意代码
  */
 
+// React 事件系统使用 `ownerDocument` 监听事件，无法拦截
+// 导致 `Event.target` 错误
+// 这里修正了 `Event.target` 的问题，但是可能对外部系统产生影响
+Object.defineProperty(Event.prototype, 'target', {
+    configurable: true,
+    get() {
+        return this.composedPath()[0];
+    },
+});
 const proxy_emptyFunction = new Function();
 function generateProxy(target, name, allowRead, allowWrite) {
     return new Proxy(target, {
@@ -4707,7 +4716,6 @@ function getGlobalObject(frameElement, doc = new Document()) {
         createEvent: document.createEvent.bind(document),
         // event
         addEventListener: (type, callback, options) => {
-            // 拦截不到 react 事件，导致 react-router link 不能正常跳转
             if (['visibilitychange'].includes(type)) {
                 frameElement._addProxyEventListener(document, type, callback, options);
             }
@@ -4862,9 +4870,12 @@ function getGlobalObject(frameElement, doc = new Document()) {
         __litHtml: true,
         litHtmlVersions: true,
         __react_router_build__: true,
+        // vue
+        setImmediate: true,
     };
-    const global = generateProxy(window, 'window', allowReadWindow, allowWriteWindow);
-    return Object.assign(allowReadWindow, Object.assign({ document: generateProxy(document, 'document', allowReadDocument, allowWriteDocument), window: global, global: global, globalThis: global, self: global }, frameElement.context));
+    const globalProxy = generateProxy(window, 'window', allowReadWindow, allowWriteWindow);
+    const documentProxy = generateProxy(document, 'document', allowReadDocument, allowWriteDocument);
+    return Object.assign(allowReadWindow, Object.assign({ document: documentProxy, window: globalProxy, global: globalProxy, globalThis: globalProxy, self: globalProxy }, frameElement.context));
 }
 
 // CONCATENATED MODULE: ./node_modules/gem-frame/src/index.ts
@@ -4931,7 +4942,7 @@ let src_GemFrame = class GemFrame extends GemElement {
                 return;
             // react app 执行前清空内容
             if (!this.tag)
-                this._cleannContent();
+                this._cleanContent();
             let src = this.src.startsWith('//') ? `${location.protocol}${this.src}` : this.src;
             let doc;
             const url = new URL(src, location.origin);
@@ -4970,7 +4981,7 @@ let src_GemFrame = class GemFrame extends GemElement {
     }
     _updateElement() {
         if (this.tag) {
-            this._cleannContent();
+            this._cleanContent();
             const app = document.createElement(this.tag);
             // 错误传播
             app.addEventListener('error', (err) => this.error(err.detail));
@@ -4996,7 +5007,7 @@ let src_GemFrame = class GemFrame extends GemElement {
         if (index !== -1)
             this._eventListenerList.splice(index, 1);
     }
-    _cleannContent() {
+    _cleanContent() {
         this.shadowRoot.innerHTML = '';
     }
     _cleanEventListener() {
@@ -5064,6 +5075,14 @@ src_GemFrame = src_decorate([
         path: '/r/a',
         content: element_html `
       <gem-frame src="/react/"></gem-frame>
+    `,
+    },
+    {
+        title: 'Vue',
+        pattern: '/v/*',
+        path: '/v/a',
+        content: element_html `
+      <gem-frame src="/vue/"></gem-frame>
     `,
     },
     {
@@ -5325,4 +5344,4 @@ element_render(element_html `
 
 /***/ })
 /******/ ]);
-//# sourceMappingURL=index.js.map?v=1339d3a23db39f0dcfe6
+//# sourceMappingURL=index.js.map?v=d82d5a046ff70bfb80f3
