@@ -14,7 +14,7 @@ export default [
     pattern: '/a/*',
     path: '/a/a', // 给 <link> 用的
     content: html`
-      <gem-frame tag="app-a-root" src="/app/"></gem-frame>
+      <gem-frame tag="app-a-root" src="/app/" @error=${console.log}></gem-frame>
     `,
   },
   {
@@ -22,7 +22,7 @@ export default [
     pattern: '/r/*',
     path: '/r/a', // 给 <link> 用的
     content: html`
-      <gem-frame src="/react/"></gem-frame>
+      <gem-frame src="/react/" @error=${console.log}></gem-frame>
     `,
   },
   {
@@ -30,7 +30,7 @@ export default [
     pattern: '/v/*',
     path: '/v/a', // 给 <link> 用的
     content: html`
-      <gem-frame src="/vue/"></gem-frame>
+      <gem-frame src="/vue/" @error=${console.log}></gem-frame>
     `,
   },
   {

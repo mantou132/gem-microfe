@@ -5,3 +5,9 @@
     <router-view></router-view>
   </div>
 </template>
+
+<style>
+:root, :host {
+  color: mediumseagreen;
+}
+</style>
