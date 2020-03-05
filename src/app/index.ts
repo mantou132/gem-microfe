@@ -7,6 +7,9 @@ import './app-a-tabs';
 import routes from './routes';
 
 export default class App extends GemElement {
+  mounted () {
+    window.addEventListener('click', console.log);
+  }
   render() {
     return html`
       <style>

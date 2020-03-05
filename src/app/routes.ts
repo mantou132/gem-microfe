@@ -34,4 +34,14 @@ export default [
       这是页面 AD
     `,
   },
+  {
+    title: '动态路由',
+    pattern: '/a/e',
+    get content() {
+      import('./dynamic')
+      return html`
+        <app-a-dynamic></app-a-dynamic>
+      `
+    },
+  },
 ] as (RouteItem & { tabIgnore: boolean })[];
