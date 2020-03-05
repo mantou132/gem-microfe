@@ -1,14 +1,8 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Route, Link } from 'react-router-dom';
-import './index.css';
 
-function Home() {
-  return <>Home</>;
-}
-
-function About() {
-  return <>About</>;
-}
+const Home = lazy(() => import('./Home'));
+const About = lazy(() => import('./About'));
 
 export default function App() {
   return (
@@ -17,8 +11,10 @@ export default function App() {
         <Link to="/r/a">Home</Link>
         <Link to="/r/b">About</Link>
       </nav>
-      <Route path="/r/a" exact component={Home}></Route>
-      <Route path="/r/b" component={About}></Route>
+      <Suspense fallback={<div>Loading...</div>}>
+        <Route path="/r/a" exact component={Home}></Route>
+        <Route path="/r/b" get component={About}></Route>
+      </Suspense>
     </BrowserRouter>
   );
 }

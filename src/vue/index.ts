@@ -1,8 +1,6 @@
 import Vue from 'vue';
 import VueRouter from 'vue-router';
 import App from './App.vue';
-import Home from './Home.vue';
-import About from './About.vue';
 
 Vue.use(VueRouter);
 
@@ -13,12 +11,12 @@ new Vue({
       {
         path: '/v/a',
         name: 'home',
-        component: Home,
+        component: () => import('./Home.vue'),
       },
       {
         path: '/v/b',
         name: 'about',
-        component: About,
+        component: () => import('./About.vue'),
       },
     ],
   }),

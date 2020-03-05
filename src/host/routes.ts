@@ -14,7 +14,7 @@ export default [
     pattern: '/a/*',
     path: '/a/a', // 给 <link> 用的
     content: html`
-      <gem-frame tag="app-a-root" src="/app/" @error=${console.log}></gem-frame>
+      <gem-frame src="/app/" @error=${console.log}></gem-frame>
     `,
   },
   {
