@@ -7,30 +7,34 @@ import 'gem-frame';
 export default [
   {
     pattern: '/',
-    redirect: '/a/a',
+    redirect: '/r',
   },
   {
     title: '页面 A',
     pattern: '/a/*',
     path: '/a/a', // 给 <link> 用的
-    content: html`
-      <gem-frame tag="app-a-root" src="/app/" @error=${console.log}></gem-frame>
-    `,
+    get content() {
+      // @ts-ignore
+      import(/* webpackIgnore: true */ '/app/main.js');
+      return html`
+        <app-a-root></app-a-root>
+      `;
+    },
   },
   {
     title: 'React',
     pattern: '/r/*',
-    path: '/r/a', // 给 <link> 用的
+    path: '/r', // 给 <link> 用的
     content: html`
-      <gem-frame src="/react/" @error=${console.log}></gem-frame>
+      <gem-frame keep-alive="on" basepath="/r" src="/react/" @error=${console.log}></gem-frame>
     `,
   },
   {
     title: 'Vue',
     pattern: '/v/*',
-    path: '/v/a', // 给 <link> 用的
+    path: '/v', // 给 <link> 用的
     content: html`
-      <gem-frame src="/vue/" @error=${console.log}></gem-frame>
+      <gem-frame keep-alive="on" basepath="/v" src="/vue/" @error=${console.log}></gem-frame>
     `,
   },
   {

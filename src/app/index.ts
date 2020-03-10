@@ -9,6 +9,9 @@ import routes from './routes';
 export default class App extends GemElement {
   mounted () {
     window.addEventListener('click', console.log);
+    return () => {
+      window.removeEventListener('click', console.log);
+    }
   }
   render() {
     return html`
@@ -27,16 +30,18 @@ export default class App extends GemElement {
 }
 customElements.define('app-a-root', App);
 
-render(
-  html`
-    <style>
-      html, body {
-        margin: 0;
-        width: 100%;
-        height: 100%;
-      }
-    </style>
-    <app-a-root></app-a-root>
-  `,
-  document.body,
-);
+if (process.env.NODE_ENV === 'development') {
+  render(
+    html`
+      <style>
+        html, body {
+          margin: 0;
+          width: 100%;
+          height: 100%;
+        }
+      </style>
+      <app-a-root></app-a-root>
+    `,
+    document.body,
+  );
+}

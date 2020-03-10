@@ -37,7 +37,7 @@ module.exports = {
   },
   output: {
     publicPath: `/${name}/`,
-    filename: 'index.js?v=[contenthash]',
+    // filename: 'index.js?v=[contenthash]',
     path: path.resolve(__dirname, `dist/${name}`),
   },
   plugins: [new HtmlWebpackPlugin(), new VueLoaderPlugin()],

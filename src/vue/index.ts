@@ -4,17 +4,17 @@ import App from './App.vue';
 
 Vue.use(VueRouter);
 
-new Vue({
+const app = new Vue({
   router: new VueRouter({
     mode: 'history',
     routes: [
       {
-        path: '/v/a',
+        path: '/',
         name: 'home',
         component: () => import('./Home.vue'),
       },
       {
-        path: '/v/b',
+        path: '/b',
         name: 'about',
         component: () => import('./About.vue'),
       },
@@ -22,3 +22,7 @@ new Vue({
   }),
   render: h => h(App),
 }).$mount(document.body.appendChild(document.createElement('div')));
+
+addEventListener('hosturlchanged', () => {
+  app.$router.replace(location.pathname);
+});
