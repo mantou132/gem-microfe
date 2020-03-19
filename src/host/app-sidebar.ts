@@ -1,4 +1,4 @@
-import { GemElement, html, ifDefined } from '@mantou/gem';
+import { GemElement, html } from '@mantou/gem';
 import routes from './routes';
 
 import '@mantou/gem/elements/link';
@@ -39,7 +39,7 @@ class Sidebar extends GemElement {
               <li>
                 <gem-active-link
                   path=${route.path || route.pattern}
-                  pattern=${ifDefined(route.path ? route.pattern : undefined)}
+                  pattern=${route.path ? route.pattern : undefined}
                 >
                   ${route.title}
                 </gem-active-link>

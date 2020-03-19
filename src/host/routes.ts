@@ -1,8 +1,21 @@
+import * as React from 'react'
+import * as ReactDOM from 'react-dom'
+import * as ReactRouter from 'react-router'
+import * as Vue from 'vue'
+
 import { html } from '@mantou/gem';
 
 import { RouteItem } from '@mantou/gem/elements/route';
 import '@mantou/gem/elements/title';
 import 'gem-frame';
+
+// https://github.com/mantou132/gem-frame/issues/11
+const context = {
+  React,
+  ReactDOM,
+  ReactRouter,
+  Vue,
+}
 
 export default [
   {
@@ -26,7 +39,7 @@ export default [
     pattern: '/r/*',
     path: '/r', // 给 <link> 用的
     content: html`
-      <gem-frame keep-alive="on" basepath="/r" src="/react/" @error=${console.log}></gem-frame>
+      <gem-frame keep-alive="on" basepath="/r" src="/react/" .context=${context} @error=${console.log}></gem-frame>
     `,
   },
   {
@@ -34,7 +47,7 @@ export default [
     pattern: '/v/*',
     path: '/v', // 给 <link> 用的
     content: html`
-      <gem-frame keep-alive="on" basepath="/v" src="/vue/" @error=${console.log}></gem-frame>
+      <gem-frame keep-alive="on" basepath="/v" src="/vue/" .context=${context} @error=${console.log}></gem-frame>
     `,
   },
   {

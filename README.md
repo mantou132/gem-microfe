@@ -4,8 +4,7 @@
 
 之前对方案有一些[思考](https://note.xianqiao.wang/post/fu-za-xi-tong-gou-jia)
 
-这里是使用 [gem](https://github.com/mantou132/gem) 做一个实践。
-基于 WebComponents，没有 iframe。
+这里是使用 [`<gem-frame>`](https://github.com/mantou132/gem-frame) 做一个实践。
 
 ### 目录介绍
 
@@ -20,9 +19,9 @@
 npm i
 
 # 子 app 的开发
-npm run start:app
+npm run start:react
 
-# 子 app 构建打包
+# 构建打包
 npm run build
 
 # 宿主 app 开发
