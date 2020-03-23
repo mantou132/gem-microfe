@@ -30,18 +30,16 @@ export default class App extends GemElement {
 }
 customElements.define('app-a-root', App);
 
-if (process.env.NODE_ENV === 'development') {
-  render(
-    html`
-      <style>
-        html, body {
-          margin: 0;
-          width: 100%;
-          height: 100%;
-        }
-      </style>
-      <app-a-root></app-a-root>
-    `,
-    document.body,
-  );
-}
+render(
+  html`
+    <style>
+      html, body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+    <app-a-root></app-a-root>
+  `,
+  document.body,
+);

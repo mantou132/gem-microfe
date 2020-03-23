@@ -2,7 +2,7 @@ import * as React from 'react'
 import * as ReactDOM from 'react-dom'
 import * as ReactRouter from 'react-router'
 import * as Vue from 'vue'
-
+import * as Gem from '@mantou/gem';
 import { html } from '@mantou/gem';
 
 import { RouteItem } from '@mantou/gem/elements/route';
@@ -11,6 +11,7 @@ import 'gem-frame';
 
 // https://github.com/mantou132/gem-frame/issues/11
 const context = {
+  Gem,
   React,
   ReactDOM,
   ReactRouter,
@@ -26,13 +27,11 @@ export default [
     title: '页面 A',
     pattern: '/a/*',
     path: '/a/a', // 给 <link> 用的
-    get content() {
-      // @ts-ignore
-      import(/* webpackIgnore: true */ '/app/main.js');
-      return html`
-        <app-a-root></app-a-root>
-      `;
-    },
+    // 不能使用 basepath，因为 history 共用
+    // 必须使用 keep-alive，因为不能重复定义自定义元素
+    content: html`
+      <gem-frame keep-alive="on" src="/app/" .context=${context} @error=${console.log}></gem-frame>
+    `,
   },
   {
     title: 'React',

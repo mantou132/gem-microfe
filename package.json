@@ -18,7 +18,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@mantou/gem": "^0.4.1",
+    "@mantou/gem": "^0.4.2",
     "gem-frame": "git+https://github.com/mantou132/gem-frame.git",
     "react": "^16.12.0",
     "react-dom": "^16.12.0",
